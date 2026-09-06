@@ -111,6 +111,21 @@ body {
   flex: none;
 }
 
+.phone-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.phone-chapter {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  flex: none;
+}
+
 .phone-name {
   font-weight: 700;
   font-size: 15px;
@@ -292,6 +307,46 @@ body {
   margin: 0 0 12px;
 }
 
+.choice-btn.locked {
+  border-style: dashed;
+  border-color: var(--line);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.choice-btn.locked:hover {
+  background: transparent;
+}
+
+/* 解禁条件。選べない理由をその場で見せて、ステータスが効いていることを伝える */
+.choice-lock {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--accent-warm);
+  letter-spacing: 0.02em;
+}
+
+.chapter-end-ending {
+  font-family: "Shippori Mincho", serif;
+  font-size: 13px;
+  color: var(--accent-warm);
+  margin-bottom: 8px;
+}
+
+.chapter-end-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chapter-end-soon {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.next-btn,
 .restart-btn {
   font-family: inherit;
   font-size: 12.5px;
@@ -301,4 +356,21 @@ body {
   background: var(--accent);
   color: var(--surface);
   cursor: pointer;
+}
+
+.next-btn {
+  background: var(--accent-warm);
+  font-weight: 700;
+}
+
+.restart-btn.ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+}
+
+.next-btn:focus-visible,
+.restart-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

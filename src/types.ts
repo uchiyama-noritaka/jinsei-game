@@ -12,6 +12,13 @@ export type StatKey = keyof Stats;
 
 export type StatDelta = Partial<Record<StatKey, number>>;
 
+// ステータスの条件。min/maxに書いたキーを「すべて」満たしたときに成立する。
+// 選択肢の解禁条件と、エンディングの分岐条件の両方で使う。
+export type Condition = {
+  min?: StatDelta;
+  max?: StatDelta;
+};
+
 export type Sender = "me" | "them" | "system";
 
 export type ScenarioMessage = {
@@ -23,6 +30,14 @@ export type Choice = {
   label: string;
   next: string; // 遷移先ノードID
   effects?: StatDelta;
+  // 満たしていないと選べない条件。知識や関係値を積んだプレイヤーにだけ開く道。
+  requires?: Condition;
+};
+
+// 会話相手。章の途中で母以外（兄・近所の人）に切り替わるときに使う。
+export type Speaker = {
+  name: string;
+  avatar: string;
 };
 
 export type ScenarioNode = {
@@ -31,8 +46,17 @@ export type ScenarioNode = {
   choices?: Choice[];
   next?: string; // choicesが無い場合の自動遷移先
   end?: boolean; // 章の終端ノードかどうか
-  // bondMotherがしきい値以上かどうかで終端メッセージを出し分けるための特別フラグ
-  endingVariant?: "warm" | "distant";
+  speaker?: Speaker; // 省略時は章のデフォルト相手
+};
+
+// 章の結び。上から順に条件を判定し、最初に成立したものを採用する。
+// 条件を持たないエンディングはフォールバックとして最後に置く。
+export type Ending = {
+  id: string;
+  title: string;
+  condition?: Condition;
+  messages: ScenarioMessage[];
+  note: string; // 結末のあとに出す、プレイヤーへの振り返り
 };
 
 export type Chapter = {
@@ -43,4 +67,6 @@ export type Chapter = {
   npcAvatar: string;
   startNode: string;
   nodes: Record<string, ScenarioNode>;
+  endings: Ending[];
+  nextChapterId?: string; // 次の章。未定義なら現時点の最終章
 };

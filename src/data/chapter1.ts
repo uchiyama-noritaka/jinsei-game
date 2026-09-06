@@ -11,6 +11,7 @@ export const chapter1: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
+  nextChapterId: "chapter2",
   nodes: {
     n1: {
       id: "n1",
@@ -93,18 +94,31 @@ export const chapter1: Chapter = {
       id: "end",
       end: true,
       messages: [],
-      // endingVariant はエンジン側で bondMother の値を見て動的に選ぶ
+      // 実際の結びは下の endings から、そのときのステータスで選ばれる
     },
   },
-};
 
-export const endingMessages = {
-  warm: [
-    { from: "them" as const, text: "いつも話聞いてくれてありがとうね" },
-    { from: "them" as const, text: "また今度、顔見せに帰ってきてね" },
-  ],
-  distant: [
-    { from: "them" as const, text: "うん、じゃあまたね" },
-    { from: "them" as const, text: "……（既読のまま、少し間があく）" },
+  // 上から順に判定し、最初に条件を満たしたものが採用される。
+  // 最後の1つは条件なし＝フォールバック。
+  endings: [
+    {
+      id: "warm",
+      title: "いつもの、ふつうの一日",
+      condition: { min: { bondMother: 55 } },
+      messages: [
+        { from: "them", text: "いつも話聞いてくれてありがとうね" },
+        { from: "them", text: "また今度、顔見せに帰ってきてね" },
+      ],
+      note: "なんてことのない会話だった。この時点では、まだ誰も気づいていない。",
+    },
+    {
+      id: "distant",
+      title: "既読のまま、少し間があく",
+      messages: [
+        { from: "them", text: "うん、じゃあまたね" },
+        { from: "them", text: "……（既読のまま、少し間があく）" },
+      ],
+      note: "忙しい日々のなかでは、これがふつうの距離感かもしれない。",
+    },
   ],
 };

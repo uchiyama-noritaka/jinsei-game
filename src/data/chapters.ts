@@ -1,0 +1,17 @@
+import type { Chapter } from "../types";
+import { chapter1 } from "./chapter1";
+import { chapter2 } from "./chapter2";
+
+// 章の登録簿。章を足すときは、ここに1行追加して
+// 前の章の nextChapterId を新しい章のIDに向けるだけでよい。
+export const chapters: Chapter[] = [chapter1, chapter2];
+
+export const FIRST_CHAPTER_ID = chapters[0].id;
+
+export function chapterById(id: string): Chapter | undefined {
+  return chapters.find((c) => c.id === id);
+}
+
+export function chapterNumber(id: string): number {
+  return chapters.findIndex((c) => c.id === id) + 1;
+}
