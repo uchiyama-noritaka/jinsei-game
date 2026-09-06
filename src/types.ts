@@ -32,13 +32,22 @@ export type Choice = {
   effects?: StatDelta;
   // 満たしていないと選べない条件。知識や関係値を積んだプレイヤーにだけ開く道。
   requires?: Condition;
+  // 選んだ直後に返ってくる一言。この選択肢を選んだときにだけ表示される。
+  // 「選んだ内容と噛み合った返事」はすべてここに置き、遷移先ノードの本文は
+  // どの選択肢のあとに読んでも成立する内容だけにする。
+  // 会話が噛み合っていない演出をしたいときは、ここに意図してそう書く。
+  reply?: ScenarioMessage[];
 };
 
 // 会話相手。章の途中で母以外（兄・近所の人）に切り替わるときに使う。
+// tone は画面の地の色を切り替えるためのキー（省略時は章の既定色）。
 export type Speaker = {
   name: string;
   avatar: string;
+  tone?: SpeakerTone;
 };
+
+export type SpeakerTone = "neighbor" | "sibling";
 
 export type ScenarioNode = {
   id: string;

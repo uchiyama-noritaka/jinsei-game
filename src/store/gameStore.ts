@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Condition, Stats, StatDelta, Sender } from "../types";
+import type { Chapter, Condition, ScenarioMessage, ScenarioNode, Speaker, Stats, StatDelta, Sender } from "../types";
 import { chapterById, chapters } from "../data/chapters";
 
 const INITIAL_STATS: Stats = {
@@ -17,6 +17,11 @@ const LEGACY_SAVE_KEYS = ["jinsei-game-save-v1"];
 export type TimelineEntry = {
   from: Sender;
   text: string;
+  // このメッセージが「誰との会話」のものか。ヘッダーと画面の地の色は、
+  // 現在ノードではなく“表示済みの最後のメッセージ”のこれに追従する。
+  // そうしないと、選んだ瞬間に相手が切り替わり、自分の発言が
+  // 次の相手のトーク画面に出ているように見えてしまう。
+  speaker?: Speaker;
 };
 
 type SavedShape = {
@@ -56,12 +61,21 @@ export function meetsCondition(stats: Stats, condition?: Condition): boolean {
   return okMin && okMax;
 }
 
+export function speakerOf(chapter: Chapter, node?: ScenarioNode): Speaker {
+  return node?.speaker ?? { name: chapter.npcName, avatar: chapter.npcAvatar };
+}
+
+function entries(messages: ScenarioMessage[], speaker: Speaker): TimelineEntry[] {
+  return messages.map((m) => ({ ...m, speaker }));
+}
+
 function firstChapterState() {
   const chapter = chapters[0];
+  const start = chapter.nodes[chapter.startNode];
   return {
     chapterId: chapter.id,
     currentNodeId: chapter.startNode,
-    timeline: [...chapter.nodes[chapter.startNode].messages],
+    timeline: entries(start.messages, speakerOf(chapter, start)),
     isEnded: false,
     endingId: null as string | null,
   };
@@ -112,7 +126,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const nextNode = chapter.nodes[choice.next];
     if (!nextNode) return;
-    const meEntry: TimelineEntry = { from: "me", text: choice.label };
+
+    // 自分の発言と、それに対する相手の返しは、まだ「今の相手」との会話。
+    // 場面が変わるのは、遷移先ノードの本文が表示され始めてから。
+    const here = speakerOf(chapter, node);
+    const meEntry: TimelineEntry = { from: "me", text: choice.label, speaker: here };
+    const replyEntries = entries(choice.reply ?? [], here);
 
     if (nextNode.end) {
       const stats = get().stats;
@@ -120,7 +139,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       const ending =
         chapter.endings.find((e) => meetsCondition(stats, e.condition)) ??
         chapter.endings[chapter.endings.length - 1];
-      const newTimeline = [...state.timeline, meEntry, ...ending.messages];
+      const newTimeline = [
+        ...state.timeline,
+        meEntry,
+        ...replyEntries,
+        ...entries(ending.messages, speakerOf(chapter, nextNode)),
+      ];
       set({
         timeline: newTimeline,
         currentNodeId: nextNode.id,
@@ -138,7 +162,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const newTimeline = [...state.timeline, meEntry, ...nextNode.messages];
+    const newTimeline = [
+      ...state.timeline,
+      meEntry,
+      ...replyEntries,
+      ...entries(nextNode.messages, speakerOf(chapter, nextNode)),
+    ];
     set({ timeline: newTimeline, currentNodeId: nextNode.id });
     persist({
       stats: get().stats,
@@ -157,7 +186,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     const next = nextId ? chapterById(nextId) : undefined;
     if (!next) return;
 
-    const timeline = [...next.nodes[next.startNode].messages];
+    const start = next.nodes[next.startNode];
+    const timeline = entries(start.messages, speakerOf(next, start));
     set({
       chapterId: next.id,
       currentNodeId: next.startNode,

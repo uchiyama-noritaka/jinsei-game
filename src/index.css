@@ -36,6 +36,24 @@
   }
 }
 
+@media (prefers-color-scheme: dark) {
+  .phone.tone-neighbor {
+    --surface: #1f2523;
+    --bubble-them: #2a312e;
+    --line: #37403a;
+    --accent-soft: #2c3a34;
+    --accent-warm-soft: #2f3a34;
+  }
+
+  .phone.tone-sibling {
+    --surface: #1e2126;
+    --bubble-them: #2a2e35;
+    --line: #383d46;
+    --accent-soft: #2b3240;
+    --accent-warm-soft: #2d3340;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -87,6 +105,26 @@ body {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  transition: background-color 0.5s ease, border-color 0.5s ease;
+}
+
+/* 会話相手が変わったら、画面の地の色も変える。
+   文字を読む前に「場面が切り替わった」と気づけるようにするため。
+   色そのものは主張させず、紙が差し替わった程度の差にとどめる。 */
+.phone.tone-neighbor {
+  --surface: #f2f4f1;
+  --bubble-them: #fcfdfb;
+  --line: #d9dfd5;
+  --accent-soft: #e3ece1;
+  --accent-warm-soft: #e7efe5;
+}
+
+.phone.tone-sibling {
+  --surface: #f1f2f6;
+  --bubble-them: #fafbfd;
+  --line: #d6d9e1;
+  --accent-soft: #e1e5ef;
+  --accent-warm-soft: #e4e7f0;
 }
 
 .phone-head {
@@ -216,6 +254,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bubble, .bubble.typing span {
     animation: none;
+  }
+
+  .phone {
+    transition: none;
   }
 }
 

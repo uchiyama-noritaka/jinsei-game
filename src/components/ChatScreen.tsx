@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useGameStore, meetsCondition } from "../store/gameStore";
+import { useGameStore, meetsCondition, speakerOf } from "../store/gameStore";
 import { chapterById, chapterNumber, chapters } from "../data/chapters";
 import { STAT_LABELS } from "../data/stats";
 import type { Choice, Stats } from "../types";
@@ -60,7 +60,9 @@ export function ChatScreen() {
 
   const chapter = chapterById(chapterId) ?? chapters[0];
   const node = chapter.nodes[currentNodeId];
-  const speaker = node?.speaker ?? { name: chapter.npcName, avatar: chapter.npcAvatar };
+  // 表示済みの最後のメッセージに合わせる。まだ1通も出ていないあいだだけ、
+  // 現在ノードの相手を使う（章の頭とセーブ読み込み直後）。
+  const speaker = timeline[revealCount - 1]?.speaker ?? speakerOf(chapter, node);
   const ending = endingId ? chapter.endings.find((e) => e.id === endingId) : undefined;
   const hasNextChapter = !!chapter.nextChapterId;
 
@@ -85,7 +87,10 @@ export function ChatScreen() {
   }
 
   return (
-    <div className="phone" onClick={!allRevealed ? handleSkip : undefined}>
+    <div
+      className={`phone${speaker.tone ? ` tone-${speaker.tone}` : ""}`}
+      onClick={!allRevealed ? handleSkip : undefined}
+    >
       <div className="phone-head">
         <div className="phone-avatar">{speaker.avatar}</div>
         <div className="phone-head-text">
