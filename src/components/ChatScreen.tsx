@@ -22,6 +22,8 @@ function requirementHint(choice: Choice): string {
 
 export function ChatScreen() {
   const stats = useGameStore((s) => s.stats);
+  const lastDelta = useGameStore((s) => s.lastDelta);
+  const changeId = useGameStore((s) => s.changeId);
   const chapterId = useGameStore((s) => s.chapterId);
   const currentNodeId = useGameStore((s) => s.currentNodeId);
   const timeline = useGameStore((s) => s.timeline);
@@ -163,7 +165,7 @@ export function ChatScreen() {
         </div>
       )}
 
-      <StatusHUD stats={stats} />
+      <StatusHUD stats={stats} lastDelta={lastDelta} changeId={changeId} />
     </div>
   );
 }

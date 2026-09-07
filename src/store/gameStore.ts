@@ -35,6 +35,12 @@ type SavedShape = {
 
 type GameState = {
   stats: Stats;
+  // 直前の選択で実際に動いたぶん（0のキーは持たない）。HUDの演出用で、セーブはしない。
+  // choice.effects ではなく前後の差を入れる。0や100で頭打ちになったときに、
+  // 動いていない数字を「+4」と表示してしまわないようにするため。
+  lastDelta: StatDelta | null;
+  // 選ぶたびに増える。同じ値に戻ったときもアニメーションをやり直せるようにするための鍵。
+  changeId: number;
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -100,6 +106,8 @@ function clearSave() {
 
 export const useGameStore = create<GameState>((set, get) => ({
   stats: { ...INITIAL_STATS },
+  lastDelta: null,
+  changeId: 0,
   ...firstChapterState(),
 
   applyDelta: (delta) => {
@@ -122,7 +130,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 条件付きの選択肢は、UIで無効化していても念のためここでも弾く
     if (!meetsCondition(state.stats, choice.requires)) return;
 
+    const before = state.stats;
     get().applyDelta(choice.effects);
+    const after = get().stats;
+    const moved: StatDelta = {};
+    (Object.keys(after) as (keyof Stats)[]).forEach((k) => {
+      if (after[k] !== before[k]) moved[k] = after[k] - before[k];
+    });
+    set((s) => ({
+      lastDelta: Object.keys(moved).length ? moved : null,
+      changeId: s.changeId + 1,
+    }));
 
     const nextNode = chapter.nodes[choice.next];
     if (!nextNode) return;
@@ -189,6 +207,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const start = next.nodes[next.startNode];
     const timeline = entries(start.messages, speakerOf(next, start));
     set({
+      lastDelta: null,
       chapterId: next.id,
       currentNodeId: next.startNode,
       timeline,
@@ -207,7 +226,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   restart: () => {
     clearSave();
-    set({ stats: { ...INITIAL_STATS }, ...firstChapterState() });
+    set({ stats: { ...INITIAL_STATS }, lastDelta: null, changeId: 0, ...firstChapterState() });
   },
 
   hydrate: () => {
@@ -220,6 +239,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!chapter || !chapter.nodes[saved.currentNodeId]) return;
       set({
         stats: saved.stats,
+        // 読み込みは「操作の結果」ではないので、演出は出さない
+        lastDelta: null,
         chapterId: saved.chapterId,
         currentNodeId: saved.currentNodeId,
         timeline: saved.timeline,

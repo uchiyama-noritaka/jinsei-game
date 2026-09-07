@@ -1,12 +1,12 @@
 :root {
-  --bg: #eeede7;
-  --surface: #ffffff;
-  --surface-2: #f6f5f0;
+  --bg: #e6e3da;
+  --surface: #f8f6f1;
+  --surface-2: #f1efe8;
   --text: #262524;
   --text-muted: #6e6b64;
   --accent: #3e5c6b;
   --accent-soft: #dde6e8;
-  --accent-warm: #c97a4a;
+  --accent-warm: #a05a2e;
   --accent-warm-soft: #f1e0d3;
   --line: #ddd9d0;
   --shadow: 0 1px 2px rgba(38, 37, 36, 0.06), 0 12px 32px rgba(38, 37, 36, 0.08);
@@ -14,6 +14,8 @@
   --bubble-me-text: #f4f6f6;
   --bubble-them: #ffffff;
   --bubble-them-text: #262524;
+  --up: #37704a;
+  --down: #a44b3c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,24 +35,8 @@
     --bubble-me-text: #14181a;
     --bubble-them: #2e3134;
     --bubble-them-text: #e9e7e1;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .phone.tone-neighbor {
-    --surface: #1f2523;
-    --bubble-them: #2a312e;
-    --line: #37403a;
-    --accent-soft: #2c3a34;
-    --accent-warm-soft: #2f3a34;
-  }
-
-  .phone.tone-sibling {
-    --surface: #1e2126;
-    --bubble-them: #2a2e35;
-    --line: #383d46;
-    --accent-soft: #2b3240;
-    --accent-warm-soft: #2d3340;
+    --up: #7cb98f;
+    --down: #e08a76;
   }
 }
 
@@ -112,19 +98,37 @@ body {
    文字を読む前に「場面が切り替わった」と気づけるようにするため。
    色そのものは主張させず、紙が差し替わった程度の差にとどめる。 */
 .phone.tone-neighbor {
-  --surface: #f2f4f1;
-  --bubble-them: #fcfdfb;
-  --line: #d9dfd5;
+  --surface: #eef2ea;
+  --bubble-them: #fdfefc;
+  --line: #d7ded1;
   --accent-soft: #e3ece1;
   --accent-warm-soft: #e7efe5;
 }
 
 .phone.tone-sibling {
-  --surface: #f1f2f6;
-  --bubble-them: #fafbfd;
-  --line: #d6d9e1;
+  --surface: #ebeef4;
+  --bubble-them: #fbfcfe;
+  --line: #d4d9e2;
   --accent-soft: #e1e5ef;
   --accent-warm-soft: #e4e7f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .phone.tone-neighbor {
+    --surface: #1f2523;
+    --bubble-them: #2a312e;
+    --line: #37403a;
+    --accent-soft: #2c3a34;
+    --accent-warm-soft: #2f3a34;
+  }
+
+  .phone.tone-sibling {
+    --surface: #1e2126;
+    --bubble-them: #2a2e35;
+    --line: #383d46;
+    --accent-soft: #2b3240;
+    --accent-warm-soft: #2d3340;
+  }
 }
 
 .phone-head {
@@ -259,6 +263,18 @@ body {
   .phone {
     transition: none;
   }
+
+  /* 回さずに、止まったあとの位置をそのまま見せる（0のまま固まるのを防ぐ） */
+  .reel-strip {
+    animation: none;
+    transform: translateY(calc(var(--to) * -1em));
+  }
+
+  .hud-delta {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -3px);
+  }
 }
 
 .system-line {
@@ -302,7 +318,7 @@ body {
   display: flex;
   gap: 6px;
   margin-top: 14px;
-  padding-top: 12px;
+  padding-top: 16px;
   border-top: 1px dashed var(--line);
   cursor: default;
 }
@@ -313,10 +329,78 @@ body {
 }
 
 .hud-stat .n {
+  position: relative;
   font-family: "JetBrains Mono", monospace;
   font-size: 14px;
+  line-height: 1;
   color: var(--accent-warm);
   font-variant-numeric: tabular-nums;
+}
+
+/* 選択でステータスが動いたとき、数字をスロットのリールのように回して止める。
+   「いまの選択が数字を動かした」と、目で結びつけられるようにするため。 */
+.reel-row {
+  display: inline-flex;
+  height: 1em;
+  overflow: hidden;
+}
+
+.reel {
+  display: block;
+  height: 1em;
+  overflow: hidden;
+}
+
+.reel-strip {
+  display: flex;
+  flex-direction: column;
+  /* both で、止まったあとも最後の数字の位置に留める */
+  animation: reel-roll 0.72s cubic-bezier(0.16, 0.72, 0.2, 1) var(--delay, 0ms) both;
+}
+
+.reel-strip > span {
+  display: block;
+  height: 1em;
+}
+
+@keyframes reel-roll {
+  from {
+    transform: translateY(calc(var(--from) * -1em));
+  }
+  84% {
+    /* 少し行き過ぎてから戻る。機械が止まるときの手応えを出す */
+    transform: translateY(calc(var(--to) * -1em - 0.18em));
+  }
+  to {
+    transform: translateY(calc(var(--to) * -1em));
+  }
+}
+
+/* 動いたぶんを数字の上に一瞬だけ出す */
+.hud-delta {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: delta-float 1.9s ease-out both;
+}
+
+.hud-delta.up {
+  color: var(--up);
+}
+
+.hud-delta.down {
+  color: var(--down);
+}
+
+@keyframes delta-float {
+  0% { opacity: 0; transform: translate(-50%, 5px); }
+  20% { opacity: 1; transform: translate(-50%, -1px); }
+  70% { opacity: 1; transform: translate(-50%, -3px); }
+  100% { opacity: 0; transform: translate(-50%, -9px); }
 }
 
 .hud-stat .l {
