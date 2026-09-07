@@ -6,6 +6,7 @@
 //  - 会話のつながりを全部書き出す（選んだ内容 → 直後の返し → 次の本文）
 //  - 全ルートを総当たりして、各エンディングと条件つき選択肢に
 //    到達できるルートが実在すること
+//  - 条件が参照しているフラグが、どこかの選択肢で実際に立つこと
 //
 // 本文の良し悪しまでは判定できないので、書き出した一覧を目で読む前提。
 
@@ -69,44 +70,89 @@ for (const ch of chapters) {
   }
 }
 
-// 全ルート総当たり
+// 全ルート総当たり。ステータスとフラグを次の章へ持ち越す。
+// 章が増えるとルート数が指数で伸びるので、結果は貯めずに数えながら進む。
 console.log("\n\n======== 到達可能性 ========");
-let starts: Stats[] = [INITIAL];
+type Run = { stats: Stats; flags: string[] };
+const START_CAP = 40000; // 次の章へ渡す開始状態の上限（超えたら間引く）
+let starts: Run[] = [{ stats: INITIAL, flags: [] }];
 const unlocked = new Set<string>();
+
 for (const ch of chapters) {
-  const results: { endingId: string; stats: Stats }[] = [];
-  const walk = (nodeId: string, stats: Stats, d = 0) => {
+  const endingCount = new Map<string, number>();
+  const lo = { ...INITIAL }, hi = { ...INITIAL };
+  let total = 0, first = true;
+  const nextStates = new Map<string, Run>();
+
+  const walk = (nodeId: string, run: Run, d = 0) => {
     if (d > 40) { fail("ループの疑い"); return; }
     const node = ch.nodes[nodeId];
     if (node.end) {
-      const e = ch.endings.find((x) => meetsCondition(stats, x.condition)) ?? ch.endings.at(-1)!;
-      results.push({ endingId: e.id, stats });
+      const e = ch.endings.find((x) => meetsCondition(run.stats, x.condition, run.flags)) ?? ch.endings.at(-1)!;
+      endingCount.set(e.id, (endingCount.get(e.id) ?? 0) + 1);
+      total++;
+      for (const k of KEYS) {
+        if (first || run.stats[k] < lo[k]) lo[k] = run.stats[k];
+        if (first || run.stats[k] > hi[k]) hi[k] = run.stats[k];
+      }
+      first = false;
+      const key = JSON.stringify(run);
+      if (!nextStates.has(key)) nextStates.set(key, run);
       return;
     }
     for (const c of node.choices ?? []) {
-      if (!meetsCondition(stats, c.requires)) continue;
+      if (!meetsCondition(run.stats, c.requires, run.flags)) continue;
       if (c.requires) unlocked.add(`${ch.id}/${nodeId}`);
-      walk(c.next, apply(stats, c.effects), d + 1);
+      const flags = c.flags ? [...new Set([...run.flags, ...c.flags])].sort() : run.flags;
+      walk(c.next, { stats: apply(run.stats, c.effects), flags }, d + 1);
     }
   };
-  const seen = new Set<string>();
-  for (const s of starts) {
-    const key = JSON.stringify(s);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    walk(ch.startNode, s);
+  for (const s0 of starts) walk(ch.startNode, s0);
+
+  console.log(`\n[${ch.id}] 開始 ${starts.length} 通り × 全選択 = ${total.toLocaleString()} ルート`);
+  if (ch.prologue) {
+    ch.prologue.forEach((pr, i) => {
+      const hits = starts.filter(
+        (r) => ch.prologue!.findIndex((p) => meetsCondition(r.stats, p.condition, r.flags)) === i,
+      ).length;
+      console.log(`  ${hits ? "OK" : "NG"}  書き出し[${i}] ${String(hits).padStart(5)}/${starts.length} 通りが該当  「${pr.messages[1]?.text ?? pr.messages[0]?.text}」`);
+      if (!hits) fail(`[${ch.id}] 書き出し[${i}] に該当する開始状態が無い`);
+    });
   }
-  console.log(`\n[${ch.id}] 開始 ${seen.size} 通り × 全選択 = ${results.length} ルート`);
   for (const e of ch.endings) {
-    const hits = results.filter((r) => r.endingId === e.id).length;
-    console.log(`  ${hits ? "OK" : "NG"}  ${e.id.padEnd(8)} ${String(hits).padStart(7)} ルート (${((hits / results.length) * 100).toFixed(1)}%)  ${e.title}`);
+    const hits = endingCount.get(e.id) ?? 0;
+    console.log(`  ${hits ? "OK" : "NG"}  ${e.id.padEnd(9)} ${String(hits.toLocaleString()).padStart(11)} ルート (${((hits / total) * 100).toFixed(1)}%)  ${e.title}`);
     if (!hits) fail(`エンディング ${e.id} に到達できるルートが無い`);
   }
-  console.log("  終了時範囲: " + KEYS.map((k) => `${k} ${Math.min(...results.map((r) => r.stats[k]))}〜${Math.max(...results.map((r) => r.stats[k]))}`).join(" / "));
-  starts = results.map((r) => r.stats);
+  console.log("  終了時範囲: " + KEYS.map((k) => `${k} ${lo[k]}〜${hi[k]}`).join(" / "));
+
+  const uniq = [...nextStates.values()];
+  if (uniq.length > START_CAP) {
+    const step = Math.ceil(uniq.length / START_CAP);
+    starts = uniq.filter((_, i) => i % step === 0);
+    console.log(`  次の章へ渡す状態: ${uniq.length.toLocaleString()} 通りのうち ${starts.length.toLocaleString()} 通りに間引き`);
+  } else {
+    starts = uniq;
+  }
 }
+
 for (const ch of chapters) for (const [id, n] of Object.entries(ch.nodes)) for (const c of n.choices ?? []) {
   if (c.requires && !unlocked.has(`${ch.id}/${id}`)) fail(`条件つき選択肢が一度も解禁されない: ${c.label}`);
 }
+
+// 条件が見ているフラグの綴りが、どこかの選択肢で実際に立つか
+const produced = new Set<string>();
+for (const ch of chapters) for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) (c.flags ?? []).forEach((f) => produced.add(f));
+const referenced = new Set<string>();
+for (const ch of chapters) {
+  for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) (c.requires?.flags ?? []).forEach((f) => referenced.add(f));
+  for (const e of ch.endings) (e.condition?.flags ?? []).forEach((f) => referenced.add(f));
+  for (const pr of ch.prologue ?? []) (pr.condition?.flags ?? []).forEach((f) => referenced.add(f));
+}
+console.log("\nフラグ: 立てている " + [...produced].join(", ") || "(なし)");
+for (const f of referenced) {
+  if (!produced.has(f)) fail(`条件が見ているフラグ「${f}」を立てる選択肢が無い（綴り違い？）`);
+}
+
 console.log(problems === 0 ? "\n=== すべてのチェックを通過 ===" : `\n=== ${problems} 件の問題 ===`);
 if (problems > 0) process.exitCode = 1;

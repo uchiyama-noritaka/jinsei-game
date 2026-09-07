@@ -19,14 +19,23 @@ export const chapter2: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
-  nodes: {
-    n1: {
-      id: "n1",
+  nextChapterId: "chapter3",
+
+  prologue: [
+    {
       messages: [
         { from: "system", text: "── 第1章から、3か月後 ──" },
         { from: "system", text: "母からのLINEは、前より増えた。" },
         { from: "system", text: "先々週は、りんごを送ったと連絡があった。" },
         { from: "system", text: "先週も、同じ知らせが届いた。" },
+      ],
+    },
+  ],
+
+  nodes: {
+    n1: {
+      id: "n1",
+      messages: [
         { from: "them", text: "ねえ、この前送ったりんご届いた？" },
         { from: "them", text: "青森の、大きいやつ" },
         { from: "system", text: "同じ問いかけを読むのは、これで3度目だった。" },

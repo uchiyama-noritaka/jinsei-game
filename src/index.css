@@ -113,6 +113,15 @@ body {
   --accent-warm-soft: #e4e7f0;
 }
 
+/* ケアマネジャー。家族の会話ではなく、制度側との会話であることを色で示す */
+.phone.tone-care {
+  --surface: #f2f1f6;
+  --bubble-them: #fcfcfe;
+  --line: #dcd9e2;
+  --accent-soft: #e6e3ee;
+  --accent-warm-soft: #e8e5f0;
+}
+
 @media (prefers-color-scheme: dark) {
   .phone.tone-neighbor {
     --surface: #1f2523;
@@ -128,6 +137,14 @@ body {
     --line: #383d46;
     --accent-soft: #2b3240;
     --accent-warm-soft: #2d3340;
+  }
+
+  .phone.tone-care {
+    --surface: #232128;
+    --bubble-them: #2f2d37;
+    --line: #3f3c48;
+    --accent-soft: #322f3d;
+    --accent-warm-soft: #34313f;
   }
 }
 
@@ -172,12 +189,19 @@ body {
   font-weight: 700;
   font-size: 15px;
   font-family: "Shippori Mincho", serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 章の副題が長くても、ヘッダーの高さが変わらないようにする */
 .phone-status {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .phone-body {

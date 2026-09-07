@@ -12,11 +12,14 @@ export type StatKey = keyof Stats;
 
 export type StatDelta = Partial<Record<StatKey, number>>;
 
-// ステータスの条件。min/maxに書いたキーを「すべて」満たしたときに成立する。
-// 選択肢の解禁条件と、エンディングの分岐条件の両方で使う。
+// 条件。書いたものを「すべて」満たしたときに成立する。
+// 選択肢の解禁条件、エンディングの分岐、章の入りの出し分けで使う。
 export type Condition = {
   min?: StatDelta;
   max?: StatDelta;
+  // 立っている必要のあるフラグ。数字に写しにくい決断（在宅か施設か、など）は
+  // ステータスではなくフラグで覚える。
+  flags?: string[];
 };
 
 export type Sender = "me" | "them" | "system";
@@ -32,6 +35,8 @@ export type Choice = {
   effects?: StatDelta;
   // 満たしていないと選べない条件。知識や関係値を積んだプレイヤーにだけ開く道。
   requires?: Condition;
+  // 選んだことを覚えておくための印。あとの章の分岐条件から参照できる。
+  flags?: string[];
   // 選んだ直後に返ってくる一言。この選択肢を選んだときにだけ表示される。
   // 「選んだ内容と噛み合った返事」はすべてここに置き、遷移先ノードの本文は
   // どの選択肢のあとに読んでも成立する内容だけにする。
@@ -47,7 +52,7 @@ export type Speaker = {
   tone?: SpeakerTone;
 };
 
-export type SpeakerTone = "neighbor" | "sibling";
+export type SpeakerTone = "neighbor" | "sibling" | "care";
 
 export type ScenarioNode = {
   id: string;
@@ -68,6 +73,13 @@ export type Ending = {
   note: string; // 結末のあとに出す、プレイヤーへの振り返り
 };
 
+// 章の入り。endings と同じで、上から順に判定して最初に成立したものを使う。
+// 前の章がどう終わったかで、書き出しを変えるために使う。
+export type Prologue = {
+  condition?: Condition;
+  messages: ScenarioMessage[];
+};
+
 export type Chapter = {
   id: string;
   title: string;
@@ -76,6 +88,10 @@ export type Chapter = {
   npcAvatar: string;
   startNode: string;
   nodes: Record<string, ScenarioNode>;
+  // 開始ノードの本文の前に差し込む導入。省略可。
+  prologue?: Prologue[];
   endings: Ending[];
   nextChapterId?: string; // 次の章。未定義なら現時点の最終章
+  // 最終章のとき、章末カードに出す次章の予告。
+  nextTeaser?: string;
 };

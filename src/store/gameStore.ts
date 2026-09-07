@@ -26,6 +26,7 @@ export type TimelineEntry = {
 
 type SavedShape = {
   stats: Stats;
+  flags?: string[];
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -41,6 +42,8 @@ type GameState = {
   lastDelta: StatDelta | null;
   // 選ぶたびに増える。同じ値に戻ったときもアニメーションをやり直せるようにするための鍵。
   changeId: number;
+  // これまでの選択で立った印。章をまたいで持ち越す。
+  flags: string[];
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -57,14 +60,15 @@ function clamp(n: number) {
   return Math.max(0, Math.min(100, n));
 }
 
-// min/maxに書いたステータスをすべて満たしていればtrue。条件なしは常にtrue。
-export function meetsCondition(stats: Stats, condition?: Condition): boolean {
+// 書かれた条件をすべて満たしていればtrue。条件なしは常にtrue。
+export function meetsCondition(stats: Stats, condition?: Condition, flags: string[] = []): boolean {
   if (!condition) return true;
   const min = condition.min ?? {};
   const max = condition.max ?? {};
   const okMin = (Object.keys(min) as (keyof Stats)[]).every((k) => stats[k] >= (min[k] ?? 0));
   const okMax = (Object.keys(max) as (keyof Stats)[]).every((k) => stats[k] <= (max[k] ?? 100));
-  return okMin && okMax;
+  const okFlags = (condition.flags ?? []).every((f) => flags.includes(f));
+  return okMin && okMax && okFlags;
 }
 
 export function speakerOf(chapter: Chapter, node?: ScenarioNode): Speaker {
@@ -75,13 +79,19 @@ function entries(messages: ScenarioMessage[], speaker: Speaker): TimelineEntry[]
   return messages.map((m) => ({ ...m, speaker }));
 }
 
+// 章の書き出し。prologue があれば、そのときの状態に合ったものを本文の前に置く。
+function startTimeline(chapter: Chapter, stats: Stats, flags: string[]): TimelineEntry[] {
+  const start = chapter.nodes[chapter.startNode];
+  const intro = chapter.prologue?.find((p) => meetsCondition(stats, p.condition, flags));
+  return entries([...(intro?.messages ?? []), ...start.messages], speakerOf(chapter, start));
+}
+
 function firstChapterState() {
   const chapter = chapters[0];
-  const start = chapter.nodes[chapter.startNode];
   return {
     chapterId: chapter.id,
     currentNodeId: chapter.startNode,
-    timeline: entries(start.messages, speakerOf(chapter, start)),
+    timeline: startTimeline(chapter, INITIAL_STATS, []),
     isEnded: false,
     endingId: null as string | null,
   };
@@ -108,6 +118,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   stats: { ...INITIAL_STATS },
   lastDelta: null,
   changeId: 0,
+  flags: [],
   ...firstChapterState(),
 
   applyDelta: (delta) => {
@@ -128,7 +139,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const choice = node?.choices?.[choiceIndex];
     if (!chapter || !choice) return;
     // 条件付きの選択肢は、UIで無効化していても念のためここでも弾く
-    if (!meetsCondition(state.stats, choice.requires)) return;
+    if (!meetsCondition(state.stats, choice.requires, state.flags)) return;
 
     const before = state.stats;
     get().applyDelta(choice.effects);
@@ -137,9 +148,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     (Object.keys(after) as (keyof Stats)[]).forEach((k) => {
       if (after[k] !== before[k]) moved[k] = after[k] - before[k];
     });
+    // 同じ印を二重に立てない
+    const flags = choice.flags
+      ? [...state.flags, ...choice.flags.filter((f) => !state.flags.includes(f))]
+      : state.flags;
     set((s) => ({
       lastDelta: Object.keys(moved).length ? moved : null,
       changeId: s.changeId + 1,
+      flags,
     }));
 
     const nextNode = chapter.nodes[choice.next];
@@ -155,7 +171,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const stats = get().stats;
       // 上から順に判定し、最初に条件を満たしたもの。全部外れたら最後の1つ。
       const ending =
-        chapter.endings.find((e) => meetsCondition(stats, e.condition)) ??
+        chapter.endings.find((e) => meetsCondition(stats, e.condition, flags)) ??
         chapter.endings[chapter.endings.length - 1];
       const newTimeline = [
         ...state.timeline,
@@ -171,6 +187,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       persist({
         stats,
+        flags,
         chapterId: chapter.id,
         currentNodeId: nextNode.id,
         timeline: newTimeline,
@@ -189,6 +206,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ timeline: newTimeline, currentNodeId: nextNode.id });
     persist({
       stats: get().stats,
+      flags,
       chapterId: chapter.id,
       currentNodeId: nextNode.id,
       timeline: newTimeline,
@@ -204,8 +222,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const next = nextId ? chapterById(nextId) : undefined;
     if (!next) return;
 
-    const start = next.nodes[next.startNode];
-    const timeline = entries(start.messages, speakerOf(next, start));
+    const timeline = startTimeline(next, state.stats, state.flags);
     set({
       lastDelta: null,
       chapterId: next.id,
@@ -216,6 +233,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
     persist({
       stats: state.stats,
+      flags: state.flags,
       chapterId: next.id,
       currentNodeId: next.startNode,
       timeline,
@@ -226,7 +244,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   restart: () => {
     clearSave();
-    set({ stats: { ...INITIAL_STATS }, lastDelta: null, changeId: 0, ...firstChapterState() });
+    set({ stats: { ...INITIAL_STATS }, lastDelta: null, changeId: 0, flags: [], ...firstChapterState() });
   },
 
   hydrate: () => {
@@ -239,6 +257,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!chapter || !chapter.nodes[saved.currentNodeId]) return;
       set({
         stats: saved.stats,
+        // フラグを持たない古いセーブでも壊れないようにする
+        flags: saved.flags ?? [],
         // 読み込みは「操作の結果」ではないので、演出は出さない
         lastDelta: null,
         chapterId: saved.chapterId,

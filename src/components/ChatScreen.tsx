@@ -24,6 +24,7 @@ export function ChatScreen() {
   const stats = useGameStore((s) => s.stats);
   const lastDelta = useGameStore((s) => s.lastDelta);
   const changeId = useGameStore((s) => s.changeId);
+  const flags = useGameStore((s) => s.flags);
   const chapterId = useGameStore((s) => s.chapterId);
   const currentNodeId = useGameStore((s) => s.currentNodeId);
   const timeline = useGameStore((s) => s.timeline);
@@ -135,7 +136,7 @@ export function ChatScreen() {
               </div>
             ) : (
               <div className="chapter-end-actions">
-                <span className="chapter-end-soon">第3章「決断編」は執筆中です</span>
+                <span className="chapter-end-soon">{chapter.nextTeaser ?? "続きは執筆中です"}</span>
                 <button className="restart-btn" onClick={handleRestart}>
                   最初からやり直す
                 </button>
@@ -148,7 +149,7 @@ export function ChatScreen() {
       {showChoices && (
         <div className="choice-stack" onClick={(e) => e.stopPropagation()}>
           {node.choices!.map((c, i) => {
-            const unlocked = meetsCondition(stats, c.requires);
+            const unlocked = meetsCondition(stats, c.requires, flags);
             return (
               <button
                 key={i}
