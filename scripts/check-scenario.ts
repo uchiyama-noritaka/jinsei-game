@@ -167,6 +167,53 @@ for (const ch of chapters) for (const [id, n] of Object.entries(ch.nodes)) for (
   if (c.requires && !unlocked.has(`${ch.id}/${id}`)) fail(`条件つき選択肢が一度も解禁されない: ${c.label}`);
 }
 
+// ── バランスの目安 ────────────────────────────────────────
+// 上の「ルート数の割合」は代表状態からの数え上げなので、極端な状態が
+// 多めに混ざっていて、実際のプレイ感とはずれる。
+// そこで、選択肢を等確率で選ぶ通しプレイを繰り返して分布も出しておく。
+// 人は等確率では選ばないので、これも真の確率ではない。傾きを見るための目安。
+const TRIALS = 20000;
+let seed = 20260908; // 実行するたびに結果が変わらないように、乱数は固定の種から作る
+const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+console.log(`\n\n======== ランダムに選んだ場合の分布（${TRIALS.toLocaleString()}回の通しプレイ）========`);
+const tally = chapters.map(() => new Map<string, number>());
+const finalStats: Stats[] = [];
+for (let t = 0; t < TRIALS; t++) {
+  let run: Run = { stats: INITIAL, flags: [] };
+  chapters.forEach((ch, ci) => {
+    let id = ch.startNode;
+    for (let step = 0; step < 40; step++) {
+      const node = ch.nodes[id];
+      if (node.end) break;
+      const open = (node.choices ?? []).filter((c) => meetsCondition(run.stats, c.requires, run.flags));
+      if (!open.length) break;
+      const c = open[Math.floor(rand() * open.length)];
+      run = {
+        stats: apply(run.stats, c.effects),
+        flags: c.flags ? [...new Set([...run.flags, ...c.flags])].sort() : run.flags,
+      };
+      id = c.next;
+    }
+    const e = ch.endings.find((x) => meetsCondition(run.stats, x.condition, run.flags)) ?? ch.endings.at(-1)!;
+    tally[ci].set(e.id, (tally[ci].get(e.id) ?? 0) + 1);
+  });
+  finalStats.push(run.stats);
+}
+chapters.forEach((ch, ci) => {
+  console.log(`\n[${ch.id}]`);
+  for (const e of ch.endings) {
+    const n = tally[ci].get(e.id) ?? 0;
+    const bar = "█".repeat(Math.round((n / TRIALS) * 40));
+    console.log(`  ${((n / TRIALS) * 100).toFixed(1).padStart(5)}%  ${bar.padEnd(40)} ${e.title}`);
+  }
+});
+const median = (k: keyof Stats) => {
+  const v = finalStats.map((s) => s[k]).sort((a, b) => a - b);
+  return v[Math.floor(v.length / 2)];
+};
+console.log("\n  最終ステータスの中央値: " + KEYS.map((k) => `${k} ${median(k)}`).join(" / "));
+
 // 条件が見ているフラグの綴りが、どこかの選択肢で実際に立つか
 const produced = new Set<string>();
 for (const ch of chapters) for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) (c.flags ?? []).forEach((f) => produced.add(f));

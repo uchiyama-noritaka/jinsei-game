@@ -20,7 +20,7 @@ export const chapter3: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
-  nextTeaser: "第4章「介護編」は執筆中です",
+  nextChapterId: "chapter4",
 
   // 第2章がどう終わったかで書き出しを変える。
   // 条件は第2章のエンディング判定と同じ式にしてあるので、結末と入りが食い違わない。
@@ -217,6 +217,18 @@ export const chapter3: Chapter = {
           ],
         },
         {
+          // 制度を知っている人だけが持ち出せる話。向き合うほど出費が増える構造に、
+          // 知識で抜け道を作っておく（調べた人が金銭的に追い詰められて終わらないように）。
+          label: "高額介護サービス費、申請してる？上限を超えた分は戻ってくるって",
+          next: "n5",
+          effects: { money: 6, bondSibling: 2, knowledge: 3 },
+          requires: { min: { knowledge: 14 } },
+          reply: [
+            { from: "them", text: "なんだそれ。知らないぞ" },
+            { from: "them", text: "……調べてみる。戻ってくるなら大きいな" },
+          ],
+        },
+        {
           // 出せる余裕がある人にだけ開く。お金で時間を買う選択。
           label: "私が多めに出す。お兄ちゃんは近くにいる分、通ってもらう",
           next: "n5",
@@ -307,7 +319,7 @@ export const chapter3: Chapter = {
           label: "小規模多機能に相談してみよう。通いも泊まりも、同じ事業所で見てもらえる",
           next: "end",
           effects: { energy: 4, bondSibling: 2, knowledge: 3 },
-          requires: { min: { knowledge: 16 } },
+          requires: { min: { knowledge: 13 } },
           flags: ["decide-home", "know-shoukibo"],
           reply: [
             { from: "them", text: "……そんな選び方があるのか" },
