@@ -70,11 +70,48 @@ for (const ch of chapters) {
   }
 }
 
-// 全ルート総当たり。ステータスとフラグを次の章へ持ち越す。
-// 章が増えるとルート数が指数で伸びるので、結果は貯めずに数えながら進む。
+// ── 到達可能性 ──────────────────────────────────────────────
+//
+// 章をまたいだ全組み合わせを数え上げるのは、もう成立しない。
+// 第2章を終えた時点で状態は37,221通りあり、第3章まで通すと
+// (ノード, 状態) の組が数千万を超えて、重複排除しても6GBで足りなくなる。
+// 章が増えるたびに指数で伸びるので、間引いて誤魔化しても先がない。
+//
+// 一方で、章の中だけのルート数は多くても2000程度しかない。
+// なので「前の章をどう終えたか」を代表的な状態に絞り、
+// 各章はその代表ごとに全数探索する。章を足しても線形にしか増えない。
+//
+// 代表に選ぶのは、各ステータスの最大・最小、2つの組み合わせの最大、
+// 前章のエンディングごと・フラグの組み合わせごとに1件。
+// ステータスの増減は足し算なので、最大値・最小値を持つ状態を入れておけば
+// 「どこまで伸ばせるか／どこまで落ちるか」は代表からでも見える。
 console.log("\n\n======== 到達可能性 ========");
 type Run = { stats: Stats; flags: string[] };
-const START_CAP = 40000; // 次の章へ渡す開始状態の上限（超えたら間引く）
+type Finished = Run & { endingId: string };
+
+function representatives(runs: Finished[]): Run[] {
+  const picked = new Map<string, Run>();
+  const add = (r?: Run) => {
+    if (!r) return;
+    const key = JSON.stringify(r);
+    if (!picked.has(key)) picked.set(key, { stats: r.stats, flags: r.flags });
+  };
+  const best = (score: (r: Finished) => number) => runs.reduce((a, b) => (score(b) > score(a) ? b : a));
+  for (const k of KEYS) {
+    add(best((r) => r.stats[k]));
+    add(best((r) => -r.stats[k]));
+  }
+  // 条件は「知識8以上かつ関係53以上」のように重なることがあるので、2つの和が最大の状態も入れる
+  for (let i = 0; i < KEYS.length; i++)
+    for (let j = i + 1; j < KEYS.length; j++) add(best((r) => r.stats[KEYS[i]] + r.stats[KEYS[j]]));
+  const once = new Set<string>();
+  for (const r of runs) {
+    const tags = [`end:${r.endingId}`, `flags:${r.flags.join(",")}`];
+    for (const t of tags) if (!once.has(t)) { once.add(t); add(r); }
+  }
+  return [...picked.values()];
+}
+
 let starts: Run[] = [{ stats: INITIAL, flags: [] }];
 const unlocked = new Set<string>();
 
@@ -82,7 +119,7 @@ for (const ch of chapters) {
   const endingCount = new Map<string, number>();
   const lo = { ...INITIAL }, hi = { ...INITIAL };
   let total = 0, first = true;
-  const nextStates = new Map<string, Run>();
+  const finished: Finished[] = [];
 
   const walk = (nodeId: string, run: Run, d = 0) => {
     if (d > 40) { fail("ループの疑い"); return; }
@@ -96,8 +133,7 @@ for (const ch of chapters) {
         if (first || run.stats[k] > hi[k]) hi[k] = run.stats[k];
       }
       first = false;
-      const key = JSON.stringify(run);
-      if (!nextStates.has(key)) nextStates.set(key, run);
+      finished.push({ ...run, endingId: e.id });
       return;
     }
     for (const c of node.choices ?? []) {
@@ -109,33 +145,24 @@ for (const ch of chapters) {
   };
   for (const s0 of starts) walk(ch.startNode, s0);
 
-  console.log(`\n[${ch.id}] 開始 ${starts.length} 通り × 全選択 = ${total.toLocaleString()} ルート`);
+  console.log(`\n[${ch.id}] 代表となる開始状態 ${starts.length} 通り × 章内の全選択 = ${total.toLocaleString()} ルート`);
   if (ch.prologue) {
     ch.prologue.forEach((pr, i) => {
       const hits = starts.filter(
         (r) => ch.prologue!.findIndex((p) => meetsCondition(r.stats, p.condition, r.flags)) === i,
       ).length;
-      console.log(`  ${hits ? "OK" : "NG"}  書き出し[${i}] ${String(hits).padStart(5)}/${starts.length} 通りが該当  「${pr.messages[1]?.text ?? pr.messages[0]?.text}」`);
-      if (!hits) fail(`[${ch.id}] 書き出し[${i}] に該当する開始状態が無い`);
+      console.log(`  ${hits ? "OK" : "NG"}  書き出し[${i}] 代表 ${String(hits).padStart(2)}/${starts.length} が該当  「${pr.messages[1]?.text ?? pr.messages[0]?.text}」`);
+      if (!hits) fail(`[${ch.id}] 書き出し[${i}] に到達する代表状態が無い`);
     });
   }
   for (const e of ch.endings) {
     const hits = endingCount.get(e.id) ?? 0;
-    console.log(`  ${hits ? "OK" : "NG"}  ${e.id.padEnd(9)} ${String(hits.toLocaleString()).padStart(11)} ルート (${((hits / total) * 100).toFixed(1)}%)  ${e.title}`);
-    if (!hits) fail(`エンディング ${e.id} に到達できるルートが無い`);
+    console.log(`  ${hits ? "OK" : "NG"}  ${e.id.padEnd(9)} ${String(hits.toLocaleString()).padStart(7)} ルート (${((hits / total) * 100).toFixed(1)}%)  ${e.title}`);
+    if (!hits) fail(`エンディング ${e.id} に到達するルートが、代表状態からは見つからない`);
   }
   console.log("  終了時範囲: " + KEYS.map((k) => `${k} ${lo[k]}〜${hi[k]}`).join(" / "));
-
-  const uniq = [...nextStates.values()];
-  if (uniq.length > START_CAP) {
-    const step = Math.ceil(uniq.length / START_CAP);
-    starts = uniq.filter((_, i) => i % step === 0);
-    console.log(`  次の章へ渡す状態: ${uniq.length.toLocaleString()} 通りのうち ${starts.length.toLocaleString()} 通りに間引き`);
-  } else {
-    starts = uniq;
-  }
+  starts = representatives(finished);
 }
-
 for (const ch of chapters) for (const [id, n] of Object.entries(ch.nodes)) for (const c of n.choices ?? []) {
   if (c.requires && !unlocked.has(`${ch.id}/${id}`)) fail(`条件つき選択肢が一度も解禁されない: ${c.label}`);
 }
