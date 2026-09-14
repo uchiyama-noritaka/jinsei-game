@@ -53,7 +53,9 @@ type GameState = {
   choose: (choiceIndex: number) => void;
   advanceChapter: () => void;
   restart: () => void;
-  hydrate: () => void;
+  // セーブを読み込んだら true。復帰直後は演出を出さず、最後の状態から再開するため
+  // 呼び出し側が「復帰したのか、最初から始めたのか」を区別できるようにしている。
+  hydrate: () => boolean;
 };
 
 function clamp(n: number) {
@@ -250,11 +252,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   hydrate: () => {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return;
+      if (!raw) return false;
       const saved = JSON.parse(raw) as SavedShape;
       // 章やノードを作り替えたあとの古いセーブで詰まないよう、実在を確認してから復元する
       const chapter = chapterById(saved.chapterId);
-      if (!chapter || !chapter.nodes[saved.currentNodeId]) return;
+      if (!chapter || !chapter.nodes[saved.currentNodeId]) return false;
       set({
         stats: saved.stats,
         // フラグを持たない古いセーブでも壊れないようにする
@@ -267,8 +269,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         isEnded: saved.isEnded,
         endingId: saved.endingId ?? null,
       });
+      return true;
     } catch {
       // 壊れたセーブは無視して初期状態のまま
+      return false;
     }
   },
 }));

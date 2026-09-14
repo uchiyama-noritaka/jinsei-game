@@ -207,11 +207,35 @@ body {
 .phone-body {
   flex: 1;
   overflow-y: auto;
+  padding: 4px 2px 12px;
+  cursor: default;
+}
+
+/* ひとつのトーク画面。相手が変わると作り直されて、右から立ち上がる。
+   前の相手とのやり取りは持ち越さない（同じ人に戻ってもまっさらから）。 */
+.talk {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 4px 2px 12px;
-  cursor: default;
+  min-height: 100%;
+  justify-content: flex-end;
+  animation: talk-open 0.4s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+@keyframes talk-open {
+  from { opacity: 0; transform: translateX(22px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ヘッダーも一緒に切り替わったことを示す */
+.phone-avatar,
+.phone-head-text {
+  animation: head-swap 0.4s ease-out both;
+}
+
+@keyframes head-swap {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .bubble-row {
@@ -286,6 +310,12 @@ body {
 
   .phone {
     transition: none;
+  }
+
+  .talk,
+  .phone-avatar,
+  .phone-head-text {
+    animation: none;
   }
 
   /* 回さずに、止まったあとの位置をそのまま見せる（0のまま固まるのを防ぐ） */
