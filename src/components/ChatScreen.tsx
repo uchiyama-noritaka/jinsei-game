@@ -6,10 +6,13 @@ import type { Choice, Speaker, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
 
-const REVEAL_DELAY_MS = 650;
-const MY_REPLY_DELAY_MS = 150;
-// 相手が変わるときは、前の画面を読み終える間を置いてから切り替える
-const SWITCH_DELAY_MS = 950;
+const REVEAL_DELAY_MS = 650; // 相手からのメッセージ
+const MY_REPLY_DELAY_MS = 150; // 自分の発言
+const NARRATION_DELAY_MS = 850; // 地の文どうしの間
+// 地の文のあと、最初のメッセージが来るまでの間。
+// 場面の前提を読む時間をとるために、ここだけ長くしている
+//（待っているあいだは入力中のアニメーションが出続ける）。
+const AFTER_NARRATION_DELAY_MS = 1600;
 
 // 「知識 5 以上」のような、選べない理由の一文をつくる
 function requirementHint(choice: Choice): string {
@@ -90,6 +93,11 @@ export function ChatScreen() {
   const talk = talks[talkIndex];
   const speaker = talk?.speaker ?? speakerOf(chapter, node);
 
+  // 次のメッセージが別の相手のものなら、ここで進行を止めて通知を出す。
+  // 自動で切り替えると、直前のやり取りを読み切る前に画面が変わってしまうため。
+  const opensNewTalk = !!talk && revealCount < timeline.length && revealCount >= talk.end;
+  const incomingTalk = opensNewTalk ? talks[talkIndex + 1] : undefined;
+
   // タイムラインが伸びたら、まだ見せていない分を1通ずつ表示する
   useEffect(() => {
     if (revealCount > timeline.length) {
@@ -97,12 +105,21 @@ export function ChatScreen() {
       return;
     }
     if (revealCount === timeline.length) return;
-    const opensNewTalk = !!talk && revealCount >= talk.end;
-    const isIncoming = timeline[revealCount]?.from !== "me";
-    const delay = opensNewTalk ? SWITCH_DELAY_MS : isIncoming ? REVEAL_DELAY_MS : MY_REPLY_DELAY_MS;
+    if (opensNewTalk) return; // 通知をタップしてもらうまで待つ
+
+    const prev = timeline[revealCount - 1];
+    const current = timeline[revealCount];
+    const delay =
+      current.from === "me"
+        ? MY_REPLY_DELAY_MS
+        : current.from === "system"
+          ? NARRATION_DELAY_MS
+          : prev?.from === "system"
+            ? AFTER_NARRATION_DELAY_MS
+            : REVEAL_DELAY_MS;
     const t = setTimeout(() => setRevealCount((c) => c + 1), delay);
     return () => clearTimeout(t);
-  }, [timeline, revealCount, talk]);
+  }, [timeline, revealCount, opensNewTalk]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -130,15 +147,24 @@ export function ChatScreen() {
 
   const allRevealed = revealCount >= timeline.length;
   const showChoices = allRevealed && !isEnded && !!node?.choices?.length;
-  // 次が別の相手なら、いまの画面で入力中を出さない（別の人が打っているように見えるため）
-  const showTyping =
-    !allRevealed && !!talk && revealCount < talk.end && timeline[revealCount]?.from !== "me";
+  // 入力中のアニメーションは、相手の発言を待っているあいだだけ。
+  // 地の文を待っているときや、次が別の相手のときには出さない。
+  const showTyping = !allRevealed && !opensNewTalk && timeline[revealCount]?.from === "them";
 
   const ending = endingId ? chapter.endings.find((e) => e.id === endingId) : undefined;
   const hasNextChapter = !!chapter.nextChapterId;
 
-  // タップでの早送りは、いま開いている画面の中だけにとどめる
-  function handleSkip() {
+  function openIncomingTalk() {
+    setRevealCount((c) => c + 1);
+  }
+
+  // 通知が出ているあいだは、どこを触っても新しいトークが開く（通知を押し損ねても進める）。
+  // それ以外のタップでの早送りは、いま開いている画面の中だけにとどめる。
+  function handleTap() {
+    if (opensNewTalk) {
+      openIncomingTalk();
+      return;
+    }
     if (talk) setRevealCount(Math.min(timeline.length, talk.end));
   }
 
@@ -159,7 +185,7 @@ export function ChatScreen() {
   return (
     <div
       className={`phone${speaker.tone ? ` tone-${speaker.tone}` : ""}`}
-      onClick={!allRevealed ? handleSkip : undefined}
+      onClick={!allRevealed ? handleTap : undefined}
     >
       <div className="phone-head">
         <div className="phone-avatar" key={`avatar-${talkIndex}`}>
@@ -173,6 +199,23 @@ export function ChatScreen() {
           {chapterNumber(chapter.id)} / {chapters.length}
         </div>
       </div>
+
+      {incomingTalk && (
+        <button
+          className="talk-notice"
+          onClick={(e) => {
+            e.stopPropagation();
+            openIncomingTalk();
+          }}
+        >
+          <span className="talk-notice-avatar">{incomingTalk.speaker.avatar}</span>
+          <span className="talk-notice-body">
+            <span className="talk-notice-name">{incomingTalk.speaker.name}</span>
+            <span className="talk-notice-text">メッセージが届きました</span>
+          </span>
+          <span className="talk-notice-cta">タップして開く</span>
+        </button>
+      )}
 
       <div className="phone-body" ref={scrollRef}>
         {/* 相手が変わるたびに作り直して、新しい画面が立ち上がるように見せる */}

@@ -16,6 +16,7 @@
   --bubble-them-text: #262524;
   --up: #37704a;
   --down: #a44b3c;
+  --notice: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,6 +38,7 @@
     --bubble-them-text: #e9e7e1;
     --up: #7cb98f;
     --down: #e08a76;
+    --notice: #383c41;
   }
 }
 
@@ -91,7 +93,88 @@ body {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  position: relative;
   transition: background-color 0.5s ease, border-color 0.5s ease;
+}
+
+/* 別の相手からメッセージが来たことを、スマホの通知のように上から出す。
+   ここで進行を止めるので、直前のやり取りを読み切ってから、
+   自分のタイミングで次のトークへ移れる。 */
+.talk-notice {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--notice);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: notice-drop 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+.talk-notice-avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-warm-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.talk-notice-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.talk-notice-name {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.talk-notice-text {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.talk-notice-cta {
+  flex: none;
+  font-size: 10px;
+  color: var(--accent-warm);
+  letter-spacing: 0.02em;
+  animation: notice-nudge 1.8s ease-in-out infinite;
+}
+
+.talk-notice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes notice-drop {
+  from { opacity: 0; transform: translateY(-16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes notice-nudge {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 /* 会話相手が変わったら、画面の地の色も変える。
@@ -314,7 +397,9 @@ body {
 
   .talk,
   .phone-avatar,
-  .phone-head-text {
+  .phone-head-text,
+  .talk-notice,
+  .talk-notice-cta {
     animation: none;
   }
 
