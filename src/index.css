@@ -205,6 +205,15 @@ body {
   --accent-warm-soft: #e8e5f0;
 }
 
+/* 父。母と同じ家族だが別の相手なので、同じ暖色系のまま一段深くする */
+.phone.tone-father {
+  --surface: #f2ece1;
+  --bubble-them: #fdfbf7;
+  --line: #ded5c6;
+  --accent-soft: #e8e0d2;
+  --accent-warm-soft: #ece2d2;
+}
+
 @media (prefers-color-scheme: dark) {
   .phone.tone-neighbor {
     --surface: #1f2523;
@@ -228,6 +237,14 @@ body {
     --line: #3f3c48;
     --accent-soft: #322f3d;
     --accent-warm-soft: #34313f;
+  }
+
+  .phone.tone-father {
+    --surface: #26221c;
+    --bubble-them: #322d26;
+    --line: #443d33;
+    --accent-soft: #38322a;
+    --accent-warm-soft: #3a332a;
   }
 }
 

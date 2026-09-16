@@ -22,7 +22,7 @@ export const chapter4: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
-  nextTeaser: "第5章は執筆中です",
+  nextChapterId: "chapter5",
 
   // 第3章でどう決めたかで書き出しが変わる。条件の細かいものから並べる。
   prologue: [

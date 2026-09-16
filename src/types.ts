@@ -52,7 +52,7 @@ export type Speaker = {
   tone?: SpeakerTone;
 };
 
-export type SpeakerTone = "neighbor" | "sibling" | "care";
+export type SpeakerTone = "neighbor" | "sibling" | "care" | "father";
 
 export type ScenarioNode = {
   id: string;
