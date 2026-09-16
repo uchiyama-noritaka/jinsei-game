@@ -64,6 +64,7 @@ export function ChatScreen() {
   // 1通ずつの再生も地の文の表示もしない。
   const [resumedCount, setResumedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const noticeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // セーブがあれば、再生し直さずに最後の状態から続ける
@@ -158,11 +159,28 @@ export function ChatScreen() {
     setRevealCount((c) => c + 1);
   }
 
-  // 通知が出ているあいだは、どこを触っても新しいトークが開く（通知を押し損ねても進める）。
-  // それ以外のタップでの早送りは、いま開いている画面の中だけにとどめる。
+  // 通知の外を触ったときは、進めずにカードを一度光らせる。
+  // 何も起きないと固まったように見えるので、押す場所のほうを教える。
+  function nudgeNotice() {
+    const el = noticeRef.current;
+    if (!el) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    el.animate(
+      [
+        { transform: "translateY(0) scale(1)", filter: "brightness(1)" },
+        { transform: "translateY(-3px) scale(1.03)", filter: "brightness(1.08)" },
+        { transform: "translateY(0) scale(1)", filter: "brightness(1)" },
+      ],
+      { duration: 460, easing: "ease-out" },
+    );
+  }
+
+  // 相手が変わるところで進められるのは通知カードだけにしている。
+  // どこを触っても進めるようにすると、早送りの手癖でタップした拍子に、
+  // 読むために作った間を自分で飛ばしてしまうため。
   function handleTap() {
     if (opensNewTalk) {
-      openIncomingTalk();
+      nudgeNotice();
       return;
     }
     if (talk) setRevealCount(Math.min(timeline.length, talk.end));
@@ -200,23 +218,6 @@ export function ChatScreen() {
         </div>
       </div>
 
-      {incomingTalk && (
-        <button
-          className="talk-notice"
-          onClick={(e) => {
-            e.stopPropagation();
-            openIncomingTalk();
-          }}
-        >
-          <span className="talk-notice-avatar">{incomingTalk.speaker.avatar}</span>
-          <span className="talk-notice-body">
-            <span className="talk-notice-name">{incomingTalk.speaker.name}</span>
-            <span className="talk-notice-text">メッセージが届きました</span>
-          </span>
-          <span className="talk-notice-cta">タップして開く</span>
-        </button>
-      )}
-
       <div className="phone-body" ref={scrollRef}>
         {/* 相手が変わるたびに作り直して、新しい画面が立ち上がるように見せる */}
         <div className="talk" key={talkIndex}>
@@ -232,6 +233,26 @@ export function ChatScreen() {
                 <span />
               </div>
             </div>
+          )}
+
+
+          {/* 別の相手からの通知。視線と親指がある会話の末尾に、上から降りてくる */}
+          {incomingTalk && (
+            <button
+              ref={noticeRef}
+              className="talk-notice"
+              onClick={(e) => {
+                e.stopPropagation();
+                openIncomingTalk();
+              }}
+            >
+              <span className="talk-notice-avatar">{incomingTalk.speaker.avatar}</span>
+              <span className="talk-notice-body">
+                <span className="talk-notice-name">{incomingTalk.speaker.name}</span>
+                <span className="talk-notice-text">メッセージが届きました</span>
+              </span>
+              <span className="talk-notice-cta">タップして開く</span>
+            </button>
           )}
 
           {isEnded && allRevealed && (
