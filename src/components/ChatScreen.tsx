@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore, meetsCondition, speakerOf } from "../store/gameStore";
 import { chapterById, chapterNumber, chapters } from "../data/chapters";
-import { STAT_LABELS } from "../data/stats";
+import { FLAG_LABELS, STAT_LABELS } from "../data/stats";
 import type { Choice, Speaker, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
@@ -14,15 +14,18 @@ const NARRATION_DELAY_MS = 850; // 地の文どうしの間
 //（待っているあいだは入力中のアニメーションが出続ける）。
 const AFTER_NARRATION_DELAY_MS = 1600;
 
-// 「知識 5 以上」のような、選べない理由の一文をつくる
+// 「知識 5 以上なら選べる」のような、選べない理由の一文をつくる。
+// ステータスの条件も、これまでの選択（フラグ）の条件も同じ形にそろえている。
 function requirementHint(choice: Choice): string {
   const min = choice.requires?.min ?? {};
   const max = choice.requires?.max ?? {};
   const parts = [
     ...(Object.keys(min) as (keyof Stats)[]).map((k) => `${STAT_LABELS[k]} ${min[k]} 以上`),
     ...(Object.keys(max) as (keyof Stats)[]).map((k) => `${STAT_LABELS[k]} ${max[k]} 以下`),
+    ...(choice.requires?.flags ?? []).map((f) => FLAG_LABELS[f] ?? f),
+    ...(choice.requires?.notFlags ?? []).map((f) => `${FLAG_LABELS[f] ?? f}ときは選べない`),
   ];
-  return `${parts.join(" / ")} で選べる`;
+  return `${parts.join(" / ")}なら選べる`;
 }
 
 type Talk = { speaker: Speaker; start: number; end: number }; // end は含まない

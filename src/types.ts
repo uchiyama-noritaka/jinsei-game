@@ -20,6 +20,9 @@ export type Condition = {
   // 立っている必要のあるフラグ。数字に写しにくい決断（在宅か施設か、など）は
   // ステータスではなくフラグで覚える。
   flags?: string[];
+  // 立っていないことが条件のフラグ。
+  // 「本人の意思を聞けないまま決めた」のような、欠けていることが意味を持つ状況に使う。
+  notFlags?: string[];
 };
 
 export type Sender = "me" | "them" | "system";
@@ -52,7 +55,7 @@ export type Speaker = {
   tone?: SpeakerTone;
 };
 
-export type SpeakerTone = "neighbor" | "sibling" | "care" | "father";
+export type SpeakerTone = "neighbor" | "sibling" | "care" | "father" | "hospital";
 
 export type ScenarioNode = {
   id: string;

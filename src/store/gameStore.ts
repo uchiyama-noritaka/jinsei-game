@@ -70,7 +70,8 @@ export function meetsCondition(stats: Stats, condition?: Condition, flags: strin
   const okMin = (Object.keys(min) as (keyof Stats)[]).every((k) => stats[k] >= (min[k] ?? 0));
   const okMax = (Object.keys(max) as (keyof Stats)[]).every((k) => stats[k] <= (max[k] ?? 100));
   const okFlags = (condition.flags ?? []).every((f) => flags.includes(f));
-  return okMin && okMax && okFlags;
+  const okNotFlags = (condition.notFlags ?? []).every((f) => !flags.includes(f));
+  return okMin && okMax && okFlags && okNotFlags;
 }
 
 export function speakerOf(chapter: Chapter, node?: ScenarioNode): Speaker {

@@ -214,6 +214,15 @@ body {
   --accent-warm-soft: #ece2d2;
 }
 
+/* 病院。家族の会話でも制度の窓口でもない、いちばん体温の低い画面にする */
+.phone.tone-hospital {
+  --surface: #e7edee;
+  --bubble-them: #fafdfd;
+  --line: #ccd7d9;
+  --accent-soft: #dce7e8;
+  --accent-warm-soft: #dfe9ea;
+}
+
 @media (prefers-color-scheme: dark) {
   .phone.tone-neighbor {
     --surface: #1f2523;
@@ -245,6 +254,14 @@ body {
     --line: #443d33;
     --accent-soft: #38322a;
     --accent-warm-soft: #3a332a;
+  }
+
+  .phone.tone-hospital {
+    --surface: #1b2224;
+    --bubble-them: #272f31;
+    --line: #35403f;
+    --accent-soft: #29383a;
+    --accent-warm-soft: #2b3a3b;
   }
 }
 

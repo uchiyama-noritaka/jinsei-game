@@ -11,6 +11,7 @@
 // 本文の良し悪しまでは判定できないので、書き出した一覧を目で読む前提。
 
 import { chapters } from "../src/data/chapters";
+import { FLAG_LABELS } from "../src/data/stats";
 import { meetsCondition } from "../src/store/gameStore";
 import type { Stats } from "../src/types";
 
@@ -218,14 +219,19 @@ console.log("\n  最終ステータスの中央値: " + KEYS.map((k) => `${k} ${
 const produced = new Set<string>();
 for (const ch of chapters) for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) (c.flags ?? []).forEach((f) => produced.add(f));
 const referenced = new Set<string>();
+const both = (c?: { flags?: string[]; notFlags?: string[] }) => [...(c?.flags ?? []), ...(c?.notFlags ?? [])];
 for (const ch of chapters) {
-  for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) (c.requires?.flags ?? []).forEach((f) => referenced.add(f));
-  for (const e of ch.endings) (e.condition?.flags ?? []).forEach((f) => referenced.add(f));
-  for (const pr of ch.prologue ?? []) (pr.condition?.flags ?? []).forEach((f) => referenced.add(f));
+  for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) both(c.requires).forEach((f) => referenced.add(f));
+  for (const e of ch.endings) both(e.condition).forEach((f) => referenced.add(f));
+  for (const pr of ch.prologue ?? []) both(pr.condition).forEach((f) => referenced.add(f));
 }
 console.log("\nフラグ: 立てている " + [...produced].join(", ") || "(なし)");
 for (const f of referenced) {
   if (!produced.has(f)) fail(`条件が見ているフラグ「${f}」を立てる選択肢が無い（綴り違い？）`);
+}
+// 選択肢の解禁条件に使うフラグは、画面に理由を出すので読み方が要る
+for (const ch of chapters) for (const n of Object.values(ch.nodes)) for (const c of n.choices ?? []) {
+  for (const f of both(c.requires)) if (!FLAG_LABELS[f]) fail(`解禁条件のフラグ「${f}」に FLAG_LABELS の読み方が無い`);
 }
 
 console.log(problems === 0 ? "\n=== すべてのチェックを通過 ===" : `\n=== ${problems} 件の問題 ===`);

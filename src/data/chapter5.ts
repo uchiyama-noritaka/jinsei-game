@@ -26,7 +26,7 @@ export const chapter5: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
-  nextTeaser: "第6章は執筆中です",
+  nextChapterId: "chapter6",
 
   // 第4章の結び方に合わせて書き出しを変える。
   // 条件は第4章のエンディング判定と同じ式・同じ順番にしてある。
