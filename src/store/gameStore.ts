@@ -22,6 +22,8 @@ export type TimelineEntry = {
   // そうしないと、選んだ瞬間に相手が切り替わり、自分の発言が
   // 次の相手のトーク画面に出ているように見えてしまう。
   speaker?: Speaker;
+  // トークを開くときの通知の一行（そのノートの最初のメッセージだけが持つ）
+  notice?: string;
 };
 
 type SavedShape = {
@@ -78,15 +80,15 @@ export function speakerOf(chapter: Chapter, node?: ScenarioNode): Speaker {
   return node?.speaker ?? { name: chapter.npcName, avatar: chapter.npcAvatar };
 }
 
-function entries(messages: ScenarioMessage[], speaker: Speaker): TimelineEntry[] {
-  return messages.map((m) => ({ ...m, speaker }));
+function entries(messages: ScenarioMessage[], speaker: Speaker, notice?: string): TimelineEntry[] {
+  return messages.map((m, i) => (i === 0 && notice ? { ...m, speaker, notice } : { ...m, speaker }));
 }
 
 // 章の書き出し。prologue があれば、そのときの状態に合ったものを本文の前に置く。
 function startTimeline(chapter: Chapter, stats: Stats, flags: string[]): TimelineEntry[] {
   const start = chapter.nodes[chapter.startNode];
   const intro = chapter.prologue?.find((p) => meetsCondition(stats, p.condition, flags));
-  return entries([...(intro?.messages ?? []), ...start.messages], speakerOf(chapter, start));
+  return entries([...(intro?.messages ?? []), ...start.messages], speakerOf(chapter, start), start.notice);
 }
 
 function firstChapterState() {
@@ -180,7 +182,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...state.timeline,
         meEntry,
         ...replyEntries,
-        ...entries(ending.messages, speakerOf(chapter, nextNode)),
+        ...entries(ending.messages, speakerOf(chapter, nextNode), nextNode.notice),
       ];
       set({
         timeline: newTimeline,
@@ -204,7 +206,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...state.timeline,
       meEntry,
       ...replyEntries,
-      ...entries(nextNode.messages, speakerOf(chapter, nextNode)),
+      ...entries(nextNode.messages, speakerOf(chapter, nextNode), nextNode.notice),
     ];
     set({ timeline: newTimeline, currentNodeId: nextNode.id });
     persist({

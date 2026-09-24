@@ -223,6 +223,15 @@ body {
   --accent-warm-soft: #dfe9ea;
 }
 
+/* 自分だけのトーク。相手がいないので、どの人物の色でもない素の紙にする */
+.phone.tone-self {
+  --surface: #f4f4f3;
+  --bubble-them: #fdfdfd;
+  --line: #dcdcda;
+  --accent-soft: #e6e6e4;
+  --accent-warm-soft: #e9e9e6;
+}
+
 @media (prefers-color-scheme: dark) {
   .phone.tone-neighbor {
     --surface: #1f2523;
@@ -262,6 +271,14 @@ body {
     --line: #35403f;
     --accent-soft: #29383a;
     --accent-warm-soft: #2b3a3b;
+  }
+
+  .phone.tone-self {
+    --surface: #212223;
+    --bubble-them: #2c2d2e;
+    --line: #3b3c3d;
+    --accent-soft: #333435;
+    --accent-warm-soft: #353637;
   }
 }
 

@@ -28,7 +28,7 @@ export const chapter6: Chapter = {
   npcName: "母",
   npcAvatar: "👵",
   startNode: "n1",
-  nextTeaser: "第7章は執筆中です",
+  nextChapterId: "chapter7",
 
   // 第5章で何を聞けていたかで書き出しが変わる。
   prologue: [

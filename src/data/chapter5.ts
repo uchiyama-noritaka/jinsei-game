@@ -315,6 +315,7 @@ export const chapter5: Chapter = {
           label: "もらっていく。うちに飾るよ",
           next: "end",
           effects: { bondMother: 4 },
+          flags: ["took-drawing"],
           reply: [
             { from: "them", text: "あらやだ、下手なのに" },
             { from: "them", text: "……でも、うれしい" },

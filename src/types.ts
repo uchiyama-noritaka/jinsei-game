@@ -55,7 +55,7 @@ export type Speaker = {
   tone?: SpeakerTone;
 };
 
-export type SpeakerTone = "neighbor" | "sibling" | "care" | "father" | "hospital";
+export type SpeakerTone = "neighbor" | "sibling" | "care" | "father" | "hospital" | "self";
 
 export type ScenarioNode = {
   id: string;
@@ -64,6 +64,9 @@ export type ScenarioNode = {
   next?: string; // choicesが無い場合の自動遷移先
   end?: boolean; // 章の終端ノードかどうか
   speaker?: Speaker; // 省略時は章のデフォルト相手
+  // このノートを開くときの通知の一行。省略時は「メッセージが届きました」。
+  // 相手から届いたのではない場面（自分でトークを開く、書きかけのメモを見るなど）で使う。
+  notice?: string;
 };
 
 // 章の結び。上から順に条件を判定し、最初に成立したものを採用する。

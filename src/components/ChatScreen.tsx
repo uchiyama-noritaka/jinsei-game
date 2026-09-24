@@ -252,7 +252,9 @@ export function ChatScreen() {
               <span className="talk-notice-avatar">{incomingTalk.speaker.avatar}</span>
               <span className="talk-notice-body">
                 <span className="talk-notice-name">{incomingTalk.speaker.name}</span>
-                <span className="talk-notice-text">メッセージが届きました</span>
+                <span className="talk-notice-text">
+                  {timeline[incomingTalk.start]?.notice ?? "メッセージが届きました"}
+                </span>
               </span>
               <span className="talk-notice-cta">タップして開く</span>
             </button>

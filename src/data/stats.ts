@@ -20,4 +20,9 @@ export const FLAG_LABELS: Record<string, string> = {
   "talked-money": "通帳の在りかを聞いていた",
   "talked-house": "実家のことを決めていた",
   "talked-care": "母の医療の希望を聞いていた",
+  "took-drawing": "あの絵を持ち帰っていた",
+  "chose-wishes": "母の言葉どおりにした",
+  "chose-together": "二人で決めた",
+  "chose-treat": "できることは全部やった",
+  "chose-doctor": "医師に委ねた",
 };
