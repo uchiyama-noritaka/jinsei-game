@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useGameStore, meetsCondition, speakerOf } from "../store/gameStore";
+import { useGameStore, meetsCondition, speakerOf, wouldExhaust } from "../store/gameStore";
 import { chapterById, chapterNumber, chapters } from "../data/chapters";
 import { FLAG_LABELS, STAT_LABELS } from "../data/stats";
+import { BREAKDOWN_ENDINGS } from "../data/breakdown";
 import type { Choice, Speaker, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
@@ -57,8 +58,10 @@ export function ChatScreen() {
   const timeline = useGameStore((s) => s.timeline);
   const isEnded = useGameStore((s) => s.isEnded);
   const endingId = useGameStore((s) => s.endingId);
+  const brokeDown = useGameStore((s) => s.brokeDown);
   const choose = useGameStore((s) => s.choose);
   const advanceChapter = useGameStore((s) => s.advanceChapter);
+  const retryChapter = useGameStore((s) => s.retryChapter);
   const restart = useGameStore((s) => s.restart);
   const hydrate = useGameStore((s) => s.hydrate);
 
@@ -155,8 +158,13 @@ export function ChatScreen() {
   // 地の文を待っているときや、次が別の相手のときには出さない。
   const showTyping = !allRevealed && !opensNewTalk && timeline[revealCount]?.from === "them";
 
-  const ending = endingId ? chapter.endings.find((e) => e.id === endingId) : undefined;
-  const hasNextChapter = !!chapter.nextChapterId;
+  const ending = brokeDown
+    ? BREAKDOWN_ENDINGS[brokeDown]
+    : endingId
+      ? chapter.endings.find((e) => e.id === endingId)
+      : undefined;
+  // 尽きて止まった章からは、次へは進めない
+  const hasNextChapter = !!chapter.nextChapterId && !brokeDown;
 
   function openIncomingTalk() {
     setRevealCount((c) => c + 1);
@@ -192,6 +200,13 @@ export function ChatScreen() {
   function handleAdvance(e: React.MouseEvent) {
     e.stopPropagation();
     advanceChapter();
+    setRevealCount(0);
+    setResumedCount(0);
+  }
+
+  function handleRetry(e: React.MouseEvent) {
+    e.stopPropagation();
+    retryChapter();
     setRevealCount(0);
     setResumedCount(0);
   }
@@ -261,27 +276,38 @@ export function ChatScreen() {
           )}
 
           {isEnded && allRevealed && (
-            <div className="chapter-end-card" onClick={(e) => e.stopPropagation()}>
-              <div className="chapter-end-title">── {chapter.title} 完 ──</div>
+            <div
+              className={`chapter-end-card${brokeDown ? " broken" : ""}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="chapter-end-title">
+                {brokeDown ? `── ${chapter.title} 中断 ──` : `── ${chapter.title} 完 ──`}
+              </div>
               {ending && <div className="chapter-end-ending">{ending.title}</div>}
               <p>{ending?.note}</p>
-              {hasNextChapter ? (
-                <div className="chapter-end-actions">
+              <div className="chapter-end-actions">
+                {hasNextChapter && (
                   <button className="next-btn" onClick={handleAdvance}>
                     次の章へ進む
                   </button>
-                  <button className="restart-btn ghost" onClick={handleRestart}>
-                    最初からやり直す
+                )}
+                {brokeDown && (
+                  <button className="next-btn" onClick={handleRetry}>
+                    {chapter.title}をやり直す
                   </button>
-                </div>
-              ) : (
-                <div className="chapter-end-actions">
+                )}
+                {!hasNextChapter && !brokeDown && (
                   <span className="chapter-end-soon">{chapter.nextTeaser ?? "続きは執筆中です"}</span>
-                  <button className="restart-btn" onClick={handleRestart}>
-                    最初からやり直す
+                )}
+                {!brokeDown && (
+                  <button className="restart-btn ghost" onClick={handleRetry}>
+                    {chapter.title}をやり直す
                   </button>
-                </div>
-              )}
+                )}
+                <button className="restart-btn ghost" onClick={handleRestart}>
+                  最初から
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -291,16 +317,23 @@ export function ChatScreen() {
         <div className="choice-stack" onClick={(e) => e.stopPropagation()}>
           {node.choices!.map((c, i) => {
             const unlocked = meetsCondition(stats, c.requires, flags);
+            // 選べはするが、選ぶとそこで物語が止まる選択
+            const cliff = unlocked ? wouldExhaust(stats, c) : null;
             return (
               <button
                 key={i}
-                className={`choice-btn${unlocked ? "" : " locked"}`}
+                className={`choice-btn${unlocked ? "" : " locked"}${cliff ? " risky" : ""}`}
                 onClick={() => choose(i)}
                 disabled={!unlocked}
                 title={unlocked ? undefined : requirementHint(c)}
               >
                 {c.label}
                 {!unlocked && <span className="choice-lock">{requirementHint(c)}</span>}
+                {cliff && (
+                  <span className="choice-cliff">
+                    これを選ぶと{STAT_LABELS[cliff]}が尽きる
+                  </span>
+                )}
               </button>
             );
           })}

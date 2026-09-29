@@ -13,6 +13,7 @@
 import { chapters } from "../src/data/chapters";
 import { FLAG_LABELS } from "../src/data/stats";
 import { meetsCondition } from "../src/store/gameStore";
+import { BREAKDOWN_ENDINGS, LIMIT_KEYS } from "../src/data/breakdown";
 import type { Stats } from "../src/types";
 
 const INITIAL: Stats = { money: 50, energy: 60, bondMother: 50, bondSibling: 50, knowledge: 0 };
@@ -141,7 +142,17 @@ for (const ch of chapters) {
       if (!meetsCondition(run.stats, c.requires, run.flags)) continue;
       if (c.requires) unlocked.add(`${ch.id}/${nodeId}`);
       const flags = c.flags ? [...new Set([...run.flags, ...c.flags])].sort() : run.flags;
-      walk(c.next, { stats: apply(run.stats, c.effects), flags }, d + 1);
+      const stats = apply(run.stats, c.effects);
+      // 気力かお金が尽きたら、章の結末を待たずにそこで止まる
+      const emptied = LIMIT_KEYS.find((k) => stats[k] === 0);
+      if (emptied) {
+        const e = BREAKDOWN_ENDINGS[emptied];
+        endingCount.set(e.id, (endingCount.get(e.id) ?? 0) + 1);
+        total++;
+        first = false;
+        continue; // 止まった先は次の章へ渡さない
+      }
+      walk(c.next, { stats, flags }, d + 1);
     }
   };
   for (const s0 of starts) walk(ch.startNode, s0);
@@ -160,6 +171,11 @@ for (const ch of chapters) {
     const hits = endingCount.get(e.id) ?? 0;
     console.log(`  ${hits ? "OK" : "NG"}  ${e.id.padEnd(9)} ${String(hits.toLocaleString()).padStart(7)} ルート (${((hits / total) * 100).toFixed(1)}%)  ${e.title}`);
     if (!hits) fail(`エンディング ${e.id} に到達するルートが、代表状態からは見つからない`);
+  }
+  for (const k of LIMIT_KEYS) {
+    const e = BREAKDOWN_ENDINGS[k];
+    const hits = endingCount.get(e.id) ?? 0;
+    if (hits) console.log(`  --  ${e.id.padEnd(9)} ${String(hits.toLocaleString()).padStart(7)} ルート (${((hits / total) * 100).toFixed(1)}%)  ${e.title}（章の途中で中断）`);
   }
   console.log("  終了時範囲: " + KEYS.map((k) => `${k} ${lo[k]}〜${hi[k]}`).join(" / "));
   starts = representatives(finished);
@@ -182,7 +198,9 @@ const tally = chapters.map(() => new Map<string, number>());
 const finalStats: Stats[] = [];
 for (let t = 0; t < TRIALS; t++) {
   let run: Run = { stats: INITIAL, flags: [] };
+  let broke: string | null = null;
   chapters.forEach((ch, ci) => {
+    if (broke) return;
     let id = ch.startNode;
     for (let step = 0; step < 40; step++) {
       const node = ch.nodes[id];
@@ -195,6 +213,13 @@ for (let t = 0; t < TRIALS; t++) {
         flags: c.flags ? [...new Set([...run.flags, ...c.flags])].sort() : run.flags,
       };
       id = c.next;
+      const emptied = LIMIT_KEYS.find((k) => run.stats[k] === 0);
+      if (emptied) { broke = emptied; break; }
+    }
+    if (broke) {
+      const e = BREAKDOWN_ENDINGS[broke];
+      tally[ci].set(e.id, (tally[ci].get(e.id) ?? 0) + 1);
+      return;
     }
     const e = ch.endings.find((x) => meetsCondition(run.stats, x.condition, run.flags)) ?? ch.endings.at(-1)!;
     tally[ci].set(e.id, (tally[ci].get(e.id) ?? 0) + 1);
@@ -203,8 +228,9 @@ for (let t = 0; t < TRIALS; t++) {
 }
 chapters.forEach((ch, ci) => {
   console.log(`\n[${ch.id}]`);
-  for (const e of ch.endings) {
+  for (const e of [...ch.endings, ...LIMIT_KEYS.map((k) => BREAKDOWN_ENDINGS[k])]) {
     const n = tally[ci].get(e.id) ?? 0;
+    if (!n && e.id.startsWith("breakdown")) continue;
     const bar = "█".repeat(Math.round((n / TRIALS) * 40));
     console.log(`  ${((n / TRIALS) * 100).toFixed(1).padStart(5)}%  ${bar.padEnd(40)} ${e.title}`);
   }

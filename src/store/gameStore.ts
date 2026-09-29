@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import type { Chapter, Condition, ScenarioMessage, ScenarioNode, Speaker, Stats, StatDelta, Sender } from "../types";
+import type { Chapter, Condition, ScenarioMessage, ScenarioNode, Speaker, StatKey, Stats, StatDelta, Sender } from "../types";
 import { chapterById, chapters } from "../data/chapters";
+import { BREAKDOWN_ENDINGS, LIMIT_KEYS } from "../data/breakdown";
+import type { Choice } from "../types";
 
 const INITIAL_STATS: Stats = {
   money: 50,
@@ -29,6 +31,8 @@ export type TimelineEntry = {
 type SavedShape = {
   stats: Stats;
   flags?: string[];
+  chapterStart?: { stats: Stats; flags: string[] };
+  brokeDown?: StatKey | null;
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -46,6 +50,11 @@ type GameState = {
   changeId: number;
   // これまでの選択で立った印。章をまたいで持ち越す。
   flags: string[];
+  // いまの章を始めたときの状態。ここへ戻せるようにしておく。
+  // これが無いと、行き詰まったときに第1章からやり直すことになる。
+  chapterStart: { stats: Stats; flags: string[] };
+  // 気力かお金が尽きて章が止まったか。止まった章からは次へ進めない。
+  brokeDown: StatKey | null;
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -54,6 +63,8 @@ type GameState = {
   applyDelta: (delta?: StatDelta) => void;
   choose: (choiceIndex: number) => void;
   advanceChapter: () => void;
+  // いまの章を、始めたときの状態からやり直す
+  retryChapter: () => void;
   restart: () => void;
   // セーブを読み込んだら true。復帰直後は演出を出さず、最後の状態から再開するため
   // 呼び出し側が「復帰したのか、最初から始めたのか」を区別できるようにしている。
@@ -74,6 +85,17 @@ export function meetsCondition(stats: Stats, condition?: Condition, flags: strin
   const okFlags = (condition.flags ?? []).every((f) => flags.includes(f));
   const okNotFlags = (condition.notFlags ?? []).every((f) => !flags.includes(f));
   return okMin && okMax && okFlags && okNotFlags;
+}
+
+// この選択を通すと、気力かお金が尽きてしまうか。
+// 選べなくはしない。無理をすればできてしまうのが実際なので、
+// 崖であることだけを見せて、踏み出すかどうかは本人に委ねる。
+export function wouldExhaust(stats: Stats, choice: Choice): StatKey | null {
+  for (const k of LIMIT_KEYS) {
+    const cost = choice.effects?.[k] ?? 0;
+    if (cost < 0 && stats[k] + cost <= 0) return k;
+  }
+  return null;
 }
 
 export function speakerOf(chapter: Chapter, node?: ScenarioNode): Speaker {
@@ -124,6 +146,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastDelta: null,
   changeId: 0,
   flags: [],
+  chapterStart: { stats: { ...INITIAL_STATS }, flags: [] },
+  brokeDown: null,
   ...firstChapterState(),
 
   applyDelta: (delta) => {
@@ -166,11 +190,38 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextNode = chapter.nodes[choice.next];
     if (!nextNode) return;
 
+    // 気力かお金が尽きたら、章の結末を待たずにここで物語が止まる。
+    // 尽きた理由そのものが結末になるので、章ごとの結末は使わない。
+    const emptied = LIMIT_KEYS.find((k) => after[k] === 0) ?? null;
+
     // 自分の発言と、それに対する相手の返しは、まだ「今の相手」との会話。
     // 場面が変わるのは、遷移先ノードの本文が表示され始めてから。
     const here = speakerOf(chapter, node);
     const meEntry: TimelineEntry = { from: "me", text: choice.label, speaker: here };
     const replyEntries = entries(choice.reply ?? [], here);
+
+    if (emptied) {
+      const ending = BREAKDOWN_ENDINGS[emptied];
+      const newTimeline = [
+        ...state.timeline,
+        meEntry,
+        ...replyEntries,
+        ...entries(ending.messages, here),
+      ];
+      set({ timeline: newTimeline, isEnded: true, endingId: ending.id, brokeDown: emptied });
+      persist({
+        stats: after,
+        flags,
+        chapterStart: state.chapterStart,
+        brokeDown: emptied,
+        chapterId: chapter.id,
+        currentNodeId: state.currentNodeId,
+        timeline: newTimeline,
+        isEnded: true,
+        endingId: ending.id,
+      });
+      return;
+    }
 
     if (nextNode.end) {
       const stats = get().stats;
@@ -193,6 +244,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       persist({
         stats,
         flags,
+        chapterStart: state.chapterStart,
+        brokeDown: null,
         chapterId: chapter.id,
         currentNodeId: nextNode.id,
         timeline: newTimeline,
@@ -212,6 +265,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     persist({
       stats: get().stats,
       flags,
+      chapterStart: state.chapterStart,
+      brokeDown: null,
       chapterId: chapter.id,
       currentNodeId: nextNode.id,
       timeline: newTimeline,
@@ -228,8 +283,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!next) return;
 
     const timeline = startTimeline(next, state.stats, state.flags);
+    const chapterStart = { stats: { ...state.stats }, flags: [...state.flags] };
     set({
       lastDelta: null,
+      brokeDown: null,
+      chapterStart,
       chapterId: next.id,
       currentNodeId: next.startNode,
       timeline,
@@ -239,6 +297,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     persist({
       stats: state.stats,
       flags: state.flags,
+      chapterStart,
+      brokeDown: null,
       chapterId: next.id,
       currentNodeId: next.startNode,
       timeline,
@@ -247,9 +307,48 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  // 章の頭へ戻す。行き詰まったときに最初からやり直さずに済むように。
+  retryChapter: () => {
+    const state = get();
+    const chapter = chapterById(state.chapterId);
+    if (!chapter) return;
+    const stats = { ...state.chapterStart.stats };
+    const flags = [...state.chapterStart.flags];
+    const timeline = startTimeline(chapter, stats, flags);
+    set({
+      stats,
+      flags,
+      timeline,
+      currentNodeId: chapter.startNode,
+      isEnded: false,
+      endingId: null,
+      brokeDown: null,
+      lastDelta: null,
+    });
+    persist({
+      stats,
+      flags,
+      chapterStart: state.chapterStart,
+      brokeDown: null,
+      chapterId: chapter.id,
+      currentNodeId: chapter.startNode,
+      timeline,
+      isEnded: false,
+      endingId: null,
+    });
+  },
+
   restart: () => {
     clearSave();
-    set({ stats: { ...INITIAL_STATS }, lastDelta: null, changeId: 0, flags: [], ...firstChapterState() });
+    set({
+      stats: { ...INITIAL_STATS },
+      lastDelta: null,
+      changeId: 0,
+      flags: [],
+      chapterStart: { stats: { ...INITIAL_STATS }, flags: [] },
+      brokeDown: null,
+      ...firstChapterState(),
+    });
   },
 
   hydrate: () => {
@@ -262,8 +361,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (!chapter || !chapter.nodes[saved.currentNodeId]) return false;
       set({
         stats: saved.stats,
-        // フラグを持たない古いセーブでも壊れないようにする
+        // 古いセーブでも壊れないようにする
         flags: saved.flags ?? [],
+        chapterStart: saved.chapterStart ?? { stats: saved.stats, flags: saved.flags ?? [] },
+        brokeDown: saved.brokeDown ?? null,
         // 読み込みは「操作の結果」ではないので、演出は出さない
         lastDelta: null,
         chapterId: saved.chapterId,

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { StatDelta, Stats } from "../types";
 import { STAT_LABELS, STAT_ORDER } from "../data/stats";
+import { DANGER_LINE, LIMIT_KEYS, WARN_LINE } from "../data/breakdown";
 
 // 0〜9 を2周ぶん並べた帯。1周まわしてから目的の数字で止めるので、
 // 変化が小さくても「回った」と分かる。
@@ -50,8 +51,17 @@ export function StatusHUD({
     <div className="hud">
       {STAT_ORDER.map((key) => {
         const delta = lastDelta?.[key] ?? 0;
+        // 尽きると物語が止まる2つだけ、残りが少なくなったら色で知らせる
+        const limited = LIMIT_KEYS.includes(key);
+        const level = !limited
+          ? ""
+          : stats[key] <= DANGER_LINE
+            ? " danger"
+            : stats[key] <= WARN_LINE
+              ? " warn"
+              : "";
         return (
-          <div className="hud-stat" key={key}>
+          <div className={`hud-stat${level}`} key={key}>
             <div className="n">
               {delta === 0 ? (
                 <span className="reel-row">{stats[key]}</span>

@@ -446,6 +446,7 @@ body {
     transition: none;
   }
 
+  .hud-stat.danger .n,
   .talk,
   .phone-avatar,
   .phone-head-text,
@@ -593,11 +594,42 @@ body {
   100% { opacity: 0; transform: translate(-50%, -9px); }
 }
 
+/* 尽きると物語が止まる2つだけ、残りが少なくなったら色が変わる。
+   数字を読まなくても、追い詰められていることが分かるように。 */
+.hud-stat.warn .n {
+  color: var(--down);
+}
+
+.hud-stat.danger .n {
+  color: var(--down);
+  font-weight: 700;
+  animation: low-pulse 1.8s ease-in-out infinite;
+}
+
+.hud-stat.danger .l {
+  color: var(--down);
+}
+
+@keyframes low-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .hud-stat .l {
   font-size: 9px;
   color: var(--text-muted);
   letter-spacing: 0.02em;
   margin-top: 2px;
+}
+
+/* 気力かお金が尽きて止まった章。完走した章とは見た目を分ける */
+.chapter-end-card.broken {
+  background: var(--accent-warm-soft);
+  border: 1px solid var(--down);
+}
+
+.chapter-end-card.broken .chapter-end-ending {
+  color: var(--down);
 }
 
 .chapter-end-card {
@@ -621,6 +653,21 @@ body {
   color: var(--text-muted);
   line-height: 1.7;
   margin: 0 0 12px;
+}
+
+/* 選べるが、選ぶとそこで物語が止まる選択。塞がずに崖だけ見せる */
+.choice-btn.risky {
+  border-color: var(--down);
+  border-style: solid;
+}
+
+.choice-cliff {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--down);
+  letter-spacing: 0.02em;
 }
 
 .choice-btn.locked {
