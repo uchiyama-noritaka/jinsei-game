@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useGameStore, meetsCondition, speakerOf, wouldExhaust } from "../store/gameStore";
+import { useGameStore, meetsCondition, speakerOf } from "../store/gameStore";
 import { chapterById, chapterNumber, chapters } from "../data/chapters";
 import { FLAG_LABELS, STAT_LABELS } from "../data/stats";
-import { BREAKDOWN_ENDINGS } from "../data/breakdown";
-import type { Choice, Speaker, Stats } from "../types";
+import { BREAKDOWN_ENDINGS, LIMIT_KEYS } from "../data/breakdown";
+import type { Choice, Speaker, StatKey, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
 
@@ -27,6 +27,18 @@ function requirementHint(choice: Choice): string {
     ...(choice.requires?.notFlags ?? []).map((f) => `${FLAG_LABELS[f] ?? f}ときは選べない`),
   ];
   return `${parts.join(" / ")}なら選べる`;
+}
+
+// 選択肢に出す負担の内訳。
+// 出すのは気力とお金だけで、関係値と知識は伏せたままにしている。
+// 時間・体力・お金は、やる前におおよそ見積もれる。人との関係がどう動くかは
+// やってみるまで分からない。出す数字と出さない数字を、そこに合わせた。
+// 「これを選ぶと尽きる」という判定は出さない。判定を出すと、選ぶのは
+// 終わらせたい人だけになり、自分の意思を通した結果として尽きる体験が消える。
+function costsOf(choice: Choice): { key: StatKey; delta: number }[] {
+  return LIMIT_KEYS.map((key) => ({ key, delta: choice.effects?.[key] ?? 0 })).filter(
+    (c) => c.delta !== 0,
+  );
 }
 
 type Talk = { speaker: Speaker; start: number; end: number }; // end は含まない
@@ -317,21 +329,28 @@ export function ChatScreen() {
         <div className="choice-stack" onClick={(e) => e.stopPropagation()}>
           {node.choices!.map((c, i) => {
             const unlocked = meetsCondition(stats, c.requires, flags);
-            // 選べはするが、選ぶとそこで物語が止まる選択
-            const cliff = unlocked ? wouldExhaust(stats, c) : null;
+            const costs = unlocked ? costsOf(c) : [];
             return (
               <button
                 key={i}
-                className={`choice-btn${unlocked ? "" : " locked"}${cliff ? " risky" : ""}`}
+                className={`choice-btn${unlocked ? "" : " locked"}`}
                 onClick={() => choose(i)}
                 disabled={!unlocked}
                 title={unlocked ? undefined : requirementHint(c)}
               >
                 {c.label}
                 {!unlocked && <span className="choice-lock">{requirementHint(c)}</span>}
-                {cliff && (
-                  <span className="choice-cliff">
-                    これを選ぶと{STAT_LABELS[cliff]}が尽きる
+                {costs.length > 0 && (
+                  <span className="choice-costs">
+                    {costs.map((cost) => (
+                      <span
+                        key={cost.key}
+                        className={`choice-cost ${cost.delta < 0 ? "spend" : "gain"}`}
+                      >
+                        {STAT_LABELS[cost.key]} {cost.delta > 0 ? "+" : "−"}
+                        {Math.abs(cost.delta)}
+                      </span>
+                    ))}
                   </span>
                 )}
               </button>
