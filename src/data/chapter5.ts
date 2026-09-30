@@ -280,9 +280,11 @@ export const chapter5: Chapter = {
           ],
         },
         {
+          // 核心をやわらかく聞く。ここまでに母との距離を作れた人にだけ出せる聞き方。
           label: "痛いのは嫌？　それとも、できるだけ長く一緒にいたい？",
           next: "n6",
           effects: { bondMother: 4, knowledge: 2 },
+          requires: { min: { bondMother: 62 } },
           flags: ["talked-care"],
           reply: [
             { from: "them", text: "……上手な聞き方ね" },

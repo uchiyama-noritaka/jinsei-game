@@ -260,9 +260,11 @@ export const chapter6: Chapter = {
       ],
       choices: [
         {
+          // 長く聞かれてこなかったことを聞く。家族として踏み込める距離が要る。
           label: "……お父さんは、どうしたい？",
           next: "n6",
           effects: { bondMother: 4, knowledge: 2 },
+          requires: { min: { bondMother: 66 } },
           reply: [
             { from: "them", text: "……長いこと、聞かれなかったな、そういうことは" },
             { from: "them", text: "そばにいてやりたい。それだけだ" },

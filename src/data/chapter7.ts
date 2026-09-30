@@ -275,10 +275,11 @@ export const chapter7: Chapter = {
         },
         {
           // 母のときに聞けた人は、同じことを父にもできると分かっている。
+          // 母のときに聞けた経験と、兄と組めている関係の両方が要る提案。
           label: "父さんの希望を、先に聞いておこう。母さんのときにやったみたいに",
           next: "n6",
           effects: { bondSibling: 4, knowledge: 3 },
-          requires: { flags: ["talked-care"] },
+          requires: { flags: ["talked-care"], min: { bondSibling: 58 } },
           flags: ["ready-next", "ask-father"],
           reply: [
             { from: "them", text: "……あれ、効いたもんな" },

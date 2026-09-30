@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore, meetsCondition, speakerOf } from "../store/gameStore";
 import { chapterById, chapterNumber, chapters } from "../data/chapters";
 import { FLAG_LABELS, STAT_LABELS } from "../data/stats";
-import { BREAKDOWN_ENDINGS, LIMIT_KEYS } from "../data/breakdown";
+import { BREAKDOWN_ENDINGS, LIMIT_KEYS, WARN_LINE } from "../data/breakdown";
 import type { Choice, Speaker, StatKey, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
@@ -30,11 +30,21 @@ function requirementHint(choice: Choice): string {
 }
 
 // 選択肢に出す負担の内訳。
+//
 // 出すのは気力とお金だけで、関係値と知識は伏せたままにしている。
 // 時間・体力・お金は、やる前におおよそ見積もれる。人との関係がどう動くかは
 // やってみるまで分からない。出す数字と出さない数字を、そこに合わせた。
 // 「これを選ぶと尽きる」という判定は出さない。判定を出すと、選ぶのは
 // 終わらせたい人だけになり、自分の意思を通した結果として尽きる体験が消える。
+//
+// そして、数字が出るのは追い詰められてからにしてある。
+// 余裕のあるうちから一部の選択肢にだけ数字が付くと、付いていない選択肢が
+// 「何も起きない選択」に見えて霞む。現実の介護者も、限界が近づいて初めて
+// 何にどれだけ使えるかを数え出す。
+function isCounting(stats: Stats): boolean {
+  return LIMIT_KEYS.some((k) => stats[k] <= WARN_LINE);
+}
+
 function costsOf(choice: Choice): { key: StatKey; delta: number }[] {
   return LIMIT_KEYS.map((key) => ({ key, delta: choice.effects?.[key] ?? 0 })).filter(
     (c) => c.delta !== 0,
@@ -83,6 +93,10 @@ export function ChatScreen() {
   const [resumedCount, setResumedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLButtonElement>(null);
+  const countingRef = useRef(false);
+  // 数え始めた場面。断りの一文は、その場面のあいだだけ出す。
+  // 描画のたびに出たり消えたりしないよう、ノードIDで覚えておく。
+  const [countingStartedAt, setCountingStartedAt] = useState<string | null>(null);
 
   useEffect(() => {
     // セーブがあれば、再生し直さずに最後の状態から続ける
@@ -144,6 +158,7 @@ export function ChatScreen() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [revealCount]);
 
+
   // いま開いているトークのうち、表示済みのぶん
   const shown = useMemo(() => {
     if (!talk) return [];
@@ -169,6 +184,16 @@ export function ChatScreen() {
   // 入力中のアニメーションは、相手の発言を待っているあいだだけ。
   // 地の文を待っているときや、次が別の相手のときには出さない。
   const showTyping = !allRevealed && !opensNewTalk && timeline[revealCount]?.from === "them";
+
+  // 数え始めたかどうか。一度始まったら、その章のあいだは出しっぱなしにする
+  // （選択のたびに出たり消えたりすると、不具合に見えるため）。
+  const counting = isCounting(stats) || countingRef.current;
+  countingRef.current = counting;
+
+  // 数え始めた最初の場面を一度だけ記録する。断りの一文は、その場面のあいだだけ出す。
+  useEffect(() => {
+    if (counting && countingStartedAt === null) setCountingStartedAt(currentNodeId);
+  }, [counting, countingStartedAt, currentNodeId]);
 
   const ending = brokeDown
     ? BREAKDOWN_ENDINGS[brokeDown]
@@ -219,6 +244,8 @@ export function ChatScreen() {
   function handleRetry(e: React.MouseEvent) {
     e.stopPropagation();
     retryChapter();
+    countingRef.current = false;
+    setCountingStartedAt(null);
     setRevealCount(0);
     setResumedCount(0);
   }
@@ -226,6 +253,8 @@ export function ChatScreen() {
   function handleRestart(e: React.MouseEvent) {
     e.stopPropagation();
     restart();
+    countingRef.current = false;
+    setCountingStartedAt(null);
     setRevealCount(0);
     setResumedCount(0);
   }
@@ -251,6 +280,11 @@ export function ChatScreen() {
       <div className="phone-body" ref={scrollRef}>
         {/* 相手が変わるたびに作り直して、新しい画面が立ち上がるように見せる */}
         <div className="talk" key={talkIndex}>
+          {showChoices && counting && countingStartedAt === currentNodeId && (
+            <div className="system-line counting-note">
+              そろそろ、何にどれだけ使えるかを数えるようになった。
+            </div>
+          )}
           {shown.map((m) => (
             <MessageBubble key={m.index} from={m.from} text={m.text} />
           ))}
@@ -329,7 +363,7 @@ export function ChatScreen() {
         <div className="choice-stack" onClick={(e) => e.stopPropagation()}>
           {node.choices!.map((c, i) => {
             const unlocked = meetsCondition(stats, c.requires, flags);
-            const costs = unlocked ? costsOf(c) : [];
+            const costs = unlocked && counting ? costsOf(c) : [];
             return (
               <button
                 key={i}

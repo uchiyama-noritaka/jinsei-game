@@ -176,11 +176,12 @@ export const chapter4: Chapter = {
         },
         {
           // 気力が落ちているときにしか出てこない言葉。
-          // 追い詰められて初めて、助けを求められるようになる。
+          // かつ、弱音は言える相手にしか吐けない。追い詰められているだけでは足りず、
+          // ここまでに兄との関係を作れているかが要る。
           label: "正直に言う。私、もう限界かもしれない",
           next: "n4",
           effects: { energy: 6, bondSibling: 5, knowledge: 2 },
-          requires: { max: { energy: 30 } },
+          requires: { max: { energy: 30 }, min: { bondSibling: 52 } },
           reply: [
             { from: "them", text: "……そうか" },
             { from: "them", text: "ごめん。気づかなかった" },
