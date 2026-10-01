@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Chapter, Condition, ScenarioMessage, ScenarioNode, Speaker, StatKey, Stats, StatDelta, Sender } from "../types";
 import { chapterById, chapters } from "../data/chapters";
 import { BREAKDOWN_ENDINGS, LIMIT_KEYS } from "../data/breakdown";
+import { loadSeen, saveSeen } from "../data/collection";
 import type { Choice } from "../types";
 
 const INITIAL_STATS: Stats = {
@@ -55,6 +56,8 @@ type GameState = {
   chapterStart: { stats: Stats; flags: string[] };
   // 気力かお金が尽きて章が止まったか。止まった章からは次へ進めない。
   brokeDown: StatKey | null;
+  // これまでに見た結末。周をまたいで残り、最初からやり直しても消えない。
+  seenEndings: string[];
   chapterId: string;
   currentNodeId: string;
   timeline: TimelineEntry[];
@@ -132,6 +135,14 @@ function persist(state: SavedShape) {
   }
 }
 
+// 見た結末を書き足す。すでにあれば何もしない。
+function remember(seen: string[], id: string): string[] {
+  if (seen.includes(id)) return seen;
+  const next = [...seen, id];
+  saveSeen(next);
+  return next;
+}
+
 function clearSave() {
   try {
     localStorage.removeItem(SAVE_KEY);
@@ -148,6 +159,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   flags: [],
   chapterStart: { stats: { ...INITIAL_STATS }, flags: [] },
   brokeDown: null,
+  seenEndings: [],
   ...firstChapterState(),
 
   applyDelta: (delta) => {
@@ -208,7 +220,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...replyEntries,
         ...entries(ending.messages, here),
       ];
-      set({ timeline: newTimeline, isEnded: true, endingId: ending.id, brokeDown: emptied });
+      set({
+        timeline: newTimeline,
+        isEnded: true,
+        endingId: ending.id,
+        brokeDown: emptied,
+        seenEndings: remember(state.seenEndings, ending.id),
+      });
       persist({
         stats: after,
         flags,
@@ -240,6 +258,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         currentNodeId: nextNode.id,
         isEnded: true,
         endingId: ending.id,
+        seenEndings: remember(state.seenEndings, ending.id),
       });
       persist({
         stats,
@@ -352,6 +371,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   hydrate: () => {
+    // 見た結末の記録は、セーブとは別に必ず読み込む
+    set({ seenEndings: loadSeen() });
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return false;

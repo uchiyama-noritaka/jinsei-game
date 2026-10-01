@@ -6,6 +6,8 @@ import { BREAKDOWN_ENDINGS, LIMIT_KEYS, WARN_LINE } from "../data/breakdown";
 import type { Choice, Speaker, StatKey, Stats } from "../types";
 import { MessageBubble } from "./MessageBubble";
 import { StatusHUD } from "./StatusHUD";
+import { EndingGallery } from "./EndingGallery";
+import { totalEndings } from "../data/collection";
 
 const REVEAL_DELAY_MS = 650; // 相手からのメッセージ
 const MY_REPLY_DELAY_MS = 150; // 自分の発言
@@ -83,6 +85,7 @@ export function ChatScreen() {
   const isEnded = useGameStore((s) => s.isEnded);
   const endingId = useGameStore((s) => s.endingId);
   const brokeDown = useGameStore((s) => s.brokeDown);
+  const seenEndings = useGameStore((s) => s.seenEndings);
   const choose = useGameStore((s) => s.choose);
   const advanceChapter = useGameStore((s) => s.advanceChapter);
   const retryChapter = useGameStore((s) => s.retryChapter);
@@ -93,6 +96,7 @@ export function ChatScreen() {
   // セーブから戻したぶんの件数。ここまでは「もう読んだ」扱いにして、
   // 1通ずつの再生も地の文の表示もしない。
   const [resumedCount, setResumedCount] = useState(0);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLButtonElement>(null);
   // 数え始めたステータス。気力とお金で別々に数え始める。
@@ -161,6 +165,15 @@ export function ChatScreen() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [revealCount]);
+
+  // 章末カードが伸びたときも追いかける。記録を開いたのに画面外、を防ぐ。
+  useEffect(() => {
+    if (!isEnded) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [galleryOpen, isEnded]);
 
 
   // いま開いているトークのうち、表示済みのぶん
@@ -242,6 +255,7 @@ export function ChatScreen() {
   function handleAdvance(e: React.MouseEvent) {
     e.stopPropagation();
     advanceChapter();
+    setGalleryOpen(false);
     setRevealCount(0);
     setResumedCount(0);
   }
@@ -249,6 +263,7 @@ export function ChatScreen() {
   function handleRetry(e: React.MouseEvent) {
     e.stopPropagation();
     retryChapter();
+    setGalleryOpen(false);
     countingRef.current = [];
     setCountingStartedAt(null);
     setRevealCount(0);
@@ -258,6 +273,7 @@ export function ChatScreen() {
   function handleRestart(e: React.MouseEvent) {
     e.stopPropagation();
     restart();
+    setGalleryOpen(false);
     countingRef.current = [];
     setCountingStartedAt(null);
     setRevealCount(0);
@@ -338,6 +354,15 @@ export function ChatScreen() {
               {ending && <div className="chapter-end-ending">{ending.title}</div>}
               <p>{ending?.note}</p>
               <div className="chapter-end-actions">
+                <button
+                  className="restart-btn ghost gallery-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGalleryOpen((v) => !v);
+                  }}
+                >
+                  結末の記録 {seenEndings.length}/{totalEndings()}
+                </button>
                 {hasNextChapter && (
                   <button className="next-btn" onClick={handleAdvance}>
                     次の章へ進む
@@ -360,6 +385,7 @@ export function ChatScreen() {
                   最初から
                 </button>
               </div>
+              {galleryOpen && <EndingGallery seen={seenEndings} />}
             </div>
           )}
         </div>
