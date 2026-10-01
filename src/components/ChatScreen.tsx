@@ -41,14 +41,16 @@ function requirementHint(choice: Choice): string {
 // 余裕のあるうちから一部の選択肢にだけ数字が付くと、付いていない選択肢が
 // 「何も起きない選択」に見えて霞む。現実の介護者も、限界が近づいて初めて
 // 何にどれだけ使えるかを数え出す。
-function isCounting(stats: Stats): boolean {
-  return LIMIT_KEYS.some((k) => stats[k] <= WARN_LINE);
+//
+// 数え始めるかどうかは、気力とお金で別々に見る。
+// お金が減っていても気力が十分なら、「気力 −2」は出さない。
+// 足りているものの数字を見せられても、読み手には意味がないため。
+function countingKeys(stats: Stats, started: StatKey[]): StatKey[] {
+  return LIMIT_KEYS.filter((k) => stats[k] <= WARN_LINE || started.includes(k));
 }
 
-function costsOf(choice: Choice): { key: StatKey; delta: number }[] {
-  return LIMIT_KEYS.map((key) => ({ key, delta: choice.effects?.[key] ?? 0 })).filter(
-    (c) => c.delta !== 0,
-  );
+function costsOf(choice: Choice, keys: StatKey[]): { key: StatKey; delta: number }[] {
+  return keys.map((key) => ({ key, delta: choice.effects?.[key] ?? 0 })).filter((c) => c.delta !== 0);
 }
 
 type Talk = { speaker: Speaker; start: number; end: number }; // end は含まない
@@ -93,7 +95,9 @@ export function ChatScreen() {
   const [resumedCount, setResumedCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLButtonElement>(null);
-  const countingRef = useRef(false);
+  // 数え始めたステータス。気力とお金で別々に数え始める。
+  // 一度始めたら、その周のあいだは出しっぱなしにする（出たり消えたりしないように）。
+  const countingRef = useRef<StatKey[]>([]);
   // 数え始めた場面。断りの一文は、その場面のあいだだけ出す。
   // 描画のたびに出たり消えたりしないよう、ノードIDで覚えておく。
   const [countingStartedAt, setCountingStartedAt] = useState<string | null>(null);
@@ -187,8 +191,9 @@ export function ChatScreen() {
 
   // 数え始めたかどうか。一度始まったら、その章のあいだは出しっぱなしにする
   // （選択のたびに出たり消えたりすると、不具合に見えるため）。
-  const counting = isCounting(stats) || countingRef.current;
-  countingRef.current = counting;
+  const counted = countingKeys(stats, countingRef.current);
+  countingRef.current = counted;
+  const counting = counted.length > 0;
 
   // 数え始めた最初の場面を一度だけ記録する。断りの一文は、その場面のあいだだけ出す。
   useEffect(() => {
@@ -244,7 +249,7 @@ export function ChatScreen() {
   function handleRetry(e: React.MouseEvent) {
     e.stopPropagation();
     retryChapter();
-    countingRef.current = false;
+    countingRef.current = [];
     setCountingStartedAt(null);
     setRevealCount(0);
     setResumedCount(0);
@@ -253,7 +258,7 @@ export function ChatScreen() {
   function handleRestart(e: React.MouseEvent) {
     e.stopPropagation();
     restart();
-    countingRef.current = false;
+    countingRef.current = [];
     setCountingStartedAt(null);
     setRevealCount(0);
     setResumedCount(0);
@@ -282,7 +287,8 @@ export function ChatScreen() {
         <div className="talk" key={talkIndex}>
           {showChoices && counting && countingStartedAt === currentNodeId && (
             <div className="system-line counting-note">
-              そろそろ、何にどれだけ使えるかを数えるようになった。
+              そろそろ、{counted.map((k) => STAT_LABELS[k]).join("と")}
+              をどれだけ使えるか、数えるようになった。
             </div>
           )}
           {shown.map((m) => (
@@ -363,7 +369,7 @@ export function ChatScreen() {
         <div className="choice-stack" onClick={(e) => e.stopPropagation()}>
           {node.choices!.map((c, i) => {
             const unlocked = meetsCondition(stats, c.requires, flags);
-            const costs = unlocked && counting ? costsOf(c) : [];
+            const costs = unlocked ? costsOf(c, counted) : [];
             return (
               <button
                 key={i}
